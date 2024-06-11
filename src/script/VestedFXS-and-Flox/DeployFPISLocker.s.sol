@@ -72,7 +72,7 @@ contract DeployFPISLocker is BaseScript {
 
         // Deploy FPISLocker implementation and its' proxy
         FPISLocker implementation = deployFPISLocker();
-        Proxy proxy = new Proxy{ salt: bytes32("lFPISABCDEFGHI") }(tempAdmin);
+        Proxy proxy = new Proxy{ salt: bytes32("lFPISABCDEFGHIJ") }(tempAdmin);
 
         // Upgrade proxy to implementation and call initialize
         bytes memory data = abi.encodeCall(
@@ -82,7 +82,7 @@ contract DeployFPISLocker is BaseScript {
         proxy.upgradeToAndCall({ _implementation: address(implementation), _data: data });
         // Pass same arguments to implementation
         implementation.initialize({
-            _admin: eventualAdmin,
+            _lockerAdmin: eventualAdmin,
             _fpisAggregator: fpisAggregator,
             _tokenAddr: token,
             _fxs: fxs,

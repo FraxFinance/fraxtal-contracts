@@ -33,15 +33,16 @@ pragma solidity >=0.8.0;
  *       maxtime (4 years?)
  */
 /* solhint-disable max-line-length, not-rely-on-time */
-import { ReentrancyGuard } from "@openzeppelin/contracts/security/ReentrancyGuard.sol";
-import { IERC20Metadata } from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 import { ERC20Burnable } from "@openzeppelin/contracts/token/ERC20/extensions/ERC20Burnable.sol";
+import { FPISLockerUtils } from "./FPISLockerUtils.sol";
+import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import { IERC20Metadata } from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
+import { IVestedFXS } from "../interfaces/IVestedFXS.sol";
 import { IlFPISEvents } from "./IlFPISEvents.sol";
 import { IlFPISStructs } from "./IlFPISStructs.sol";
-import { FPISLockerUtils } from "./FPISLockerUtils.sol";
-import { IVestedFXS } from "../interfaces/IVestedFXS.sol";
 import { IveFXSStructs } from "../VestedFXS/IveFXSStructs.sol";
-import "forge-std/console2.sol";
+import { ReentrancyGuard } from "@openzeppelin/contracts/security/ReentrancyGuard.sol";
+import { SafeERC20 } from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
 /**
  * @title FPISLocker (lFPIS)
@@ -211,10 +212,10 @@ contract FPISLocker is ReentrancyGuard, IlFPISStructs, IlFPISEvents {
     uint256 public decimals;
 
     /// @notice Admin of this contract
-    address public admin;
+    address public lockerAdmin;
 
     /// @notice Future admin of this contract, if applicable
-    address public futureAdmin;
+    address public futureLockerAdmin;
 
     /// @notice If a given address is a Flox Contributor. contributor => isContributor
     mapping(address contributor => bool isContributor) public floxContributors;
@@ -231,7 +232,7 @@ contract FPISLocker is ReentrancyGuard, IlFPISStructs, IlFPISEvents {
     /**
      * @notice Initialize contract
      * @dev Same values are set to proxy and implementation.
-     * @param _admin Initial admin of the smart contract
+     * @param _lockerAdmin Initial admin of the smart contract
      * @param _fpisAggregator Address to receive `FPIS` post FXS conversion
      * @param _tokenAddr `FPIS` token address
      * @param _fxs `FXS` token address
@@ -241,7 +242,7 @@ contract FPISLocker is ReentrancyGuard, IlFPISStructs, IlFPISEvents {
      * @param _version Contract version
      */
     function initialize(
-        address _admin,
+        address _lockerAdmin,
         address _fpisAggregator,
         address _tokenAddr,
         address _fxs,
@@ -261,7 +262,7 @@ contract FPISLocker is ReentrancyGuard, IlFPISStructs, IlFPISEvents {
             revert InitializeFailed();
         }
 
-        admin = _admin;
+        lockerAdmin = _lockerAdmin;
 
         // Initialize the 0th pointHistory
         pointHistory[0].blk = block.number;
@@ -1059,7 +1060,6 @@ contract FPISLocker is ReentrancyGuard, IlFPISStructs, IlFPISEvents {
 
     /**
      * @notice Deposit `_value` tokens for `_addr` and add to the lock
-     * @dev Anyone (even a smart contract) can deposit for someone else, but cannot extend their locktime and deposit for a brand new user
      * @dev WARNING: Since the `_value` is of `uint256` type and the `amount` in `LockedBalance` is of `int128` type,
      *  there is a risk of overflow. This does not impact lFPIS as the maximum supply of FPIS is 100M, but it could
      *  provide a risk for protocols forking this smart contract if their maximum supply is higher than maximum value of
@@ -1305,7 +1305,7 @@ contract FPISLocker is ReentrancyGuard, IlFPISStructs, IlFPISEvents {
 
     /**
      * @notice Deposit `_value` tokens for `msg.sender` and lock until `_unlockTime`
-     * @dev Users should only be allowed to create locks for themselves, the only exemption being Flow contributors that
+     * @dev Users should only be allowed to create locks for themselves, the only exemption being Flox contributors that
      *  can create locks for other users.
      * @dev Flox contributors can only create 8 locks for themselves. Even if they are Flox contributors, they cannot
      *  create contributor locks for themselves.
@@ -1460,9 +1460,6 @@ contract FPISLocker is ReentrancyGuard, IlFPISStructs, IlFPISEvents {
         uint128 _lFpisLockIndex,
         uint128 _veFxsLockIndex
     ) public returns (uint128 _lockIndex, uint256 _fxsGenerated) {
-        // Revert if operations are paused
-        if (isPaused) revert OperationIsPaused();
-
         // Make sure conversions are active
         _isFxsConversionActive();
 
@@ -1595,9 +1592,6 @@ contract FPISLocker is ReentrancyGuard, IlFPISStructs, IlFPISEvents {
      * @param _lockIndex Index of the user's lock that is getting withdrawn
      */
     function withdrawLockAsFxs(uint128 _lockIndex) public returns (uint256 _fpisAmount, uint256 _fxsAmount) {
-        // Revert if operations are paused
-        if (isPaused) revert OperationIsPaused();
-
         // Make sure conversions are active
         _isFxsConversionActive();
 
@@ -1624,9 +1618,6 @@ contract FPISLocker is ReentrancyGuard, IlFPISStructs, IlFPISEvents {
      * @param _lockIndices Indices of the user's locks that are getting withdrawn
      */
     function bulkWithdrawLockAsFxs(uint128[] memory _lockIndices) external {
-        // Revert if operations are paused
-        if (isPaused) revert OperationIsPaused();
-
         // Make sure conversions are active
         _isFxsConversionActive();
 
@@ -1732,12 +1723,12 @@ contract FPISLocker is ReentrancyGuard, IlFPISStructs, IlFPISEvents {
      * @notice Apply ownership transfer. Only callable by the future admin. Do commitTransferOwnership first
      */
     function acceptTransferOwnership() external {
-        if (msg.sender != futureAdmin) revert FutureAdminOnly();
-        address _admin = futureAdmin;
-        if (_admin == address(0)) revert AdminNotSet(); // This is now unreachable, but I don't mind leaving it for the extremely remote chance that someone figures out a way to execute calls from 0x0
-        admin = _admin;
-        futureAdmin = address(0);
-        emit ApplyOwnership(_admin);
+        if (msg.sender != futureLockerAdmin) revert FutureLockerAdminOnly();
+        address _lockerAdmin = futureLockerAdmin;
+        if (_lockerAdmin == address(0)) revert LockerAdminNotSet(); // This is now unreachable, but I don't mind leaving it for the extremely remote chance that someone figures out a way to execute calls from 0x0
+        lockerAdmin = _lockerAdmin;
+        futureLockerAdmin = address(0);
+        emit ApplyOwnership(_lockerAdmin);
     }
 
     /**
@@ -1745,8 +1736,8 @@ contract FPISLocker is ReentrancyGuard, IlFPISStructs, IlFPISEvents {
      * @param _addr Address to have ownership transferred to
      */
     function commitTransferOwnership(address _addr) external {
-        if (msg.sender != admin) revert AdminOnly();
-        futureAdmin = _addr;
+        if (msg.sender != lockerAdmin) revert LockerAdminOnly();
+        futureLockerAdmin = _addr;
         emit CommitOwnership(_addr);
     }
 
@@ -1756,9 +1747,9 @@ contract FPISLocker is ReentrancyGuard, IlFPISStructs, IlFPISEvents {
      * @param _amount Amount of tokens to recover
      */
     function recoverIERC20(address _tokenAddr, uint256 _amount) external {
-        if (msg.sender != admin) revert AdminOnly();
+        if (msg.sender != lockerAdmin) revert LockerAdminOnly();
         if (_tokenAddr == address(fpis)) revert UnableToRecoverFPIS(); // Use `activateEmergencyUnlock` instead and have users pull theirs out individually
-        require(IERC20Metadata(_tokenAddr).transfer(admin, _amount));
+        SafeERC20.safeTransfer(IERC20(_tokenAddr), lockerAdmin, _amount);
     }
 
     /**
@@ -1767,7 +1758,7 @@ contract FPISLocker is ReentrancyGuard, IlFPISStructs, IlFPISEvents {
      * @param _isFloxContributor Boolean indicating if the address is a Flox contributor or not
      */
     function setFloxContributor(address _floxContributor, bool _isFloxContributor) external {
-        if (msg.sender != admin) revert AdminOnly();
+        if (msg.sender != lockerAdmin) revert LockerAdminOnly();
         floxContributors[_floxContributor] = _isFloxContributor;
 
         emit FloxContributorUpdate(_floxContributor, _isFloxContributor);
@@ -1778,7 +1769,7 @@ contract FPISLocker is ReentrancyGuard, IlFPISStructs, IlFPISEvents {
      * @param _lFpisUtilsAddr Address of the FPISLockerUtils contract
      */
     function setLFPISUtils(address _lFpisUtilsAddr) external {
-        if (msg.sender != admin) revert AdminOnly();
+        if (msg.sender != lockerAdmin) revert LockerAdminOnly();
 
         // Set the utils contract
         lFpisUtils = FPISLockerUtils(_lFpisUtilsAddr);
@@ -1790,7 +1781,7 @@ contract FPISLocker is ReentrancyGuard, IlFPISStructs, IlFPISEvents {
      * @notice Pause/Unpause critical functions
      */
     function toggleContractPause() external {
-        if (msg.sender != admin) revert AdminOnly();
+        if (msg.sender != lockerAdmin) revert LockerAdminOnly();
         isPaused = !isPaused;
         emit ContractPause(isPaused);
     }
@@ -1799,7 +1790,7 @@ contract FPISLocker is ReentrancyGuard, IlFPISStructs, IlFPISEvents {
      * @notice Used to allow early withdrawals of lFPIS back into FPIS, in case of an emergency. Only users themselves can pull out the FPIS, not the admin. Once toggled, cannot be undone as slope/bias math will be permanently off going forward.
      */
     function activateEmergencyUnlock() external {
-        if (msg.sender != admin) revert AdminOnly();
+        if (msg.sender != lockerAdmin) revert LockerAdminOnly();
         if (emergencyUnlockActive) revert EmergencyUnlockActive();
         emergencyUnlockActive = true;
         emit EmergencyUnlockActivated();
@@ -1809,19 +1800,13 @@ contract FPISLocker is ReentrancyGuard, IlFPISStructs, IlFPISEvents {
      * @notice Update the allowance of FXS for veFXS to maximum value
      */
     function updateVeFXSAllowance() public {
-        if (msg.sender != admin) revert AdminOnly();
+        if (msg.sender != lockerAdmin) revert LockerAdminOnly();
         fxs.approve(address(veFxs), type(uint256).max);
     }
 
     // ==============================================================================
     // Errors
     // ==============================================================================
-
-    /// @notice If the admin was never set
-    error AdminNotSet();
-
-    /// @notice Only the admin can call this function
-    error AdminOnly();
 
     /// @notice If the array lengths do not match
     error ArrayLengthMismatch();
@@ -1839,7 +1824,7 @@ contract FPISLocker is ReentrancyGuard, IlFPISStructs, IlFPISEvents {
     error EmergencyUnlockActive();
 
     /// @notice Only the future admin can call this function
-    error FutureAdminOnly();
+    error FutureLockerAdminOnly();
 
     /// @notice If the FXS conversion start timestamp has not been reached
     /// @param currentTimestamp The current timestamp
@@ -1869,6 +1854,12 @@ contract FPISLocker is ReentrancyGuard, IlFPISStructs, IlFPISEvents {
 
     /// @notice When you are trying to withdraw before the lock expires
     error LockDidNotExpire();
+
+    /// @notice If the admin was never set
+    error LockerAdminNotSet();
+
+    /// @notice Only the admin can call this function
+    error LockerAdminOnly();
 
     /// @notice If you are trying to extend or add to an already expired lock. Withdraw that lock and create a new one instead
     error LockExpired();

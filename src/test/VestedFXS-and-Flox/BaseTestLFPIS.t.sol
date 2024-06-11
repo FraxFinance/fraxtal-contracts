@@ -44,6 +44,9 @@ contract BaseTestLFPIS is FraxTest, IlFPISEvents, IlFPISStructs, Constants.Helpe
     uint128 public LOCK_SECONDS_MAX_TWO_THIRDS; // Number of weeks to get a 0.9997x lFPIS multiplier
     uint128 public LOCK_SECONDS_MAX; // Number of weeks to get a 1.333x lFPIS multiplier
 
+    uint256 public HALF_PCT_DELTA = 0.005e18;
+    uint256 public ONE_PCT_DELTA = 0.01e18;
+
     int128 public constant VOTE_WEIGHT_MULTIPLIER = 13_330 - 3330;
 
     int128 public constant VOTE_BASIS_POINTS = 10_000;
@@ -84,7 +87,7 @@ contract BaseTestLFPIS is FraxTest, IlFPISEvents, IlFPISStructs, Constants.Helpe
         flox = new FloxIncentivesDistributor(address(lockedFPIS), address(token));
 
         // Print the admin
-        console.log("lockedFPIS admin (in BaseTest): ", lockedFPIS.admin());
+        console.log("lockedFPIS admin (in BaseTest): ", lockedFPIS.lockerAdmin());
         console.log("This address (in BaseTest): ", address(this));
 
         // Set the vestedFXS admin to this contract
@@ -93,7 +96,7 @@ contract BaseTestLFPIS is FraxTest, IlFPISEvents, IlFPISStructs, Constants.Helpe
         vestedFXS.acceptTransferOwnership();
 
         // Set the lockedFPIS admin to this contract
-        hoax(lockedFPIS.admin());
+        hoax(lockedFPIS.lockerAdmin());
         lockedFPIS.commitTransferOwnership(address(this));
         lockedFPIS.acceptTransferOwnership();
 

@@ -9,6 +9,8 @@ import { console } from "frax-std/FraxTest.sol";
 import "forge-std/console2.sol";
 
 contract Unit_Test_FPISLocker is BaseTestLFPIS {
+    FPISLockerUtils fpisLockerUtils;
+
     function lockedFPISSetup() public {
         console.log("lockedFPISSetup() called");
         super.defaultSetup();
@@ -16,6 +18,9 @@ contract Unit_Test_FPISLocker is BaseTestLFPIS {
         // Mint FPIS to the test users
         token.mint(alice, 100e18);
         token.mint(bob, 100e18);
+
+        // Set the FPISLockerUtils
+        fpisLockerUtils = new FPISLockerUtils(address(lockedFPIS));
     }
 
     function test_commitTransferOwnership() public {
@@ -24,9 +29,9 @@ contract Unit_Test_FPISLocker is BaseTestLFPIS {
         vm.expectEmit(false, false, false, true);
         emit CommitOwnership(bob);
         lockedFPIS.commitTransferOwnership(bob);
-        assertEq(lockedFPIS.futureAdmin(), bob);
+        assertEq(lockedFPIS.futureLockerAdmin(), bob);
 
-        vm.expectRevert(FPISLocker.AdminOnly.selector);
+        vm.expectRevert(FPISLocker.LockerAdminOnly.selector);
         hoax(bob);
         lockedFPIS.commitTransferOwnership(bob);
     }
@@ -39,9 +44,9 @@ contract Unit_Test_FPISLocker is BaseTestLFPIS {
         emit ApplyOwnership(bob);
         hoax(bob);
         lockedFPIS.acceptTransferOwnership();
-        assertEq(lockedFPIS.admin(), bob);
+        assertEq(lockedFPIS.lockerAdmin(), bob);
 
-        vm.expectRevert(FPISLocker.FutureAdminOnly.selector);
+        vm.expectRevert(FPISLocker.FutureLockerAdminOnly.selector);
         hoax(alice);
         lockedFPIS.acceptTransferOwnership();
 
@@ -49,7 +54,7 @@ contract Unit_Test_FPISLocker is BaseTestLFPIS {
         hoax(bob);
         lockedFPIS.commitTransferOwnership(address(0));
         hoax(address(0));
-        vm.expectRevert(FPISLocker.AdminNotSet.selector);
+        vm.expectRevert(FPISLocker.LockerAdminNotSet.selector);
         lockedFPIS.acceptTransferOwnership();
     }
 
@@ -68,7 +73,7 @@ contract Unit_Test_FPISLocker is BaseTestLFPIS {
         emit ContractPause(false);
         lockedFPIS.toggleContractPause();
 
-        vm.expectRevert(FPISLocker.AdminOnly.selector);
+        vm.expectRevert(FPISLocker.LockerAdminOnly.selector);
         hoax(bob);
         lockedFPIS.toggleContractPause();
     }
@@ -81,7 +86,7 @@ contract Unit_Test_FPISLocker is BaseTestLFPIS {
         lockedFPIS.activateEmergencyUnlock();
         assertEq(lockedFPIS.emergencyUnlockActive(), true);
 
-        vm.expectRevert(FPISLocker.AdminOnly.selector);
+        vm.expectRevert(FPISLocker.LockerAdminOnly.selector);
         hoax(bob);
         lockedFPIS.activateEmergencyUnlock();
     }
@@ -101,7 +106,7 @@ contract Unit_Test_FPISLocker is BaseTestLFPIS {
         lockedFPIS.setFloxContributor(bob, false);
         assertEq(lockedFPIS.floxContributors(bob), false);
 
-        vm.expectRevert(FPISLocker.AdminOnly.selector);
+        vm.expectRevert(FPISLocker.LockerAdminOnly.selector);
         hoax(bob);
         lockedFPIS.setFloxContributor(bob, true);
     }
@@ -116,7 +121,7 @@ contract Unit_Test_FPISLocker is BaseTestLFPIS {
         lockedFPIS.recoverIERC20(address(unrelated), 100e18);
         assertEq(unrelated.balanceOf(address(lockedFPIS)), 0);
 
-        vm.expectRevert(FPISLocker.AdminOnly.selector);
+        vm.expectRevert(FPISLocker.LockerAdminOnly.selector);
         hoax(bob);
         lockedFPIS.recoverIERC20(address(unrelated), 100e18);
 
@@ -656,7 +661,7 @@ contract Unit_Test_FPISLocker is BaseTestLFPIS {
         assertApproxEqRel(lockedFPIS.balanceOf(bob), 999.75 gwei, 0.01e18, "Bob's initial lFPIS balance");
 
         // Emergency unlock
-        hoax(lockedFPIS.admin());
+        hoax(lockedFPIS.lockerAdmin());
         lockedFPIS.activateEmergencyUnlock();
 
         // Have Alice withdraw
@@ -1237,7 +1242,7 @@ contract Unit_Test_FPISLocker is BaseTestLFPIS {
 
         lockedFPIS.toggleContractPause();
 
-        vm.expectRevert(FPISLocker.OperationIsPaused.selector);
+        vm.expectRevert(FPISLocker.MaximumVeFxsContributorLocksReached.selector);
         hoax(alice);
         lockedFPIS.convertToFXSAndLockInVeFXS(true, 0, 0);
     }
@@ -1371,6 +1376,28 @@ contract Unit_Test_FPISLocker is BaseTestLFPIS {
         lockedFPIS.bulkConvertToFXSAndLockInVeFXS(false, inputLockIndices, outputLockIndices);
     }
 
+    function test_getCrudeExpectedLFPISMultiLock() public {
+        lockedFPISSetup();
+
+        // Get two crude LFPISs one at a time
+        uint256 _expectedLFPISOneLockNum1 = fpisLockerUtils.getCrudeExpectedLFPISOneLock(1e18, uint128(WEEK));
+        uint256 _expectedLFPISOneLockNum2 = fpisLockerUtils.getCrudeExpectedLFPISOneLock(10e18, uint128(LOCK_SECONDS_MAX_TWO_THIRDS));
+
+        // Get two crude LFPISs in one call
+        int128[] memory _fpisAmounts = new int128[](2);
+        _fpisAmounts[0] = 1e18;
+        _fpisAmounts[1] = 10e18;
+        uint128[] memory _lockSecsU128 = new uint128[](2);
+        _lockSecsU128[0] = uint128(WEEK);
+        _lockSecsU128[1] = uint128(LOCK_SECONDS_MAX_TWO_THIRDS);
+        uint256 _expectedLFPISMultiLock = fpisLockerUtils.getCrudeExpectedLFPISMultiLock(_fpisAmounts, _lockSecsU128);
+
+        // The sums of both methods should match, and it should be about 21 LFPIS
+        assertEq(_expectedLFPISOneLockNum1 + _expectedLFPISOneLockNum2, _expectedLFPISMultiLock, "Sums of getCrudeExpectedLFPIS methods should match");
+        assertApproxEqRel(_expectedLFPISOneLockNum1 + _expectedLFPISOneLockNum2, 10.333e18, ONE_PCT_DELTA, "Sum of getCrudeExpectedLFPISOneLock should be 10.333 LFPIS");
+        assertApproxEqRel(_expectedLFPISMultiLock, 10.333e18, ONE_PCT_DELTA, "Sum of getCrudeExpectedLFPISMultiLock should be 10.333 LFPIS");
+    }
+
     function test_withdrawLockAsFxs() public {
         lockedFPISSetup();
 
@@ -1404,7 +1431,7 @@ contract Unit_Test_FPISLocker is BaseTestLFPIS {
         lockedFPIS.withdrawLockAsFxs(0);
 
         lockedFPIS.toggleContractPause();
-        vm.expectRevert(FPISLocker.OperationIsPaused.selector);
+        vm.expectRevert(abi.encodeWithSelector(FPISLocker.FxsConversionNotActive.selector, initialTimestamp, lockedFPIS.FXS_CONVERSION_START_TIMESTAMP()));
         hoax(alice);
         lockedFPIS.withdrawLockAsFxs(0);
         lockedFPIS.toggleContractPause();
@@ -1476,7 +1503,7 @@ contract Unit_Test_FPISLocker is BaseTestLFPIS {
         lockedFPIS.withdrawLockAsFxs(0);
 
         lockedFPIS.toggleContractPause();
-        vm.expectRevert(FPISLocker.OperationIsPaused.selector);
+        vm.expectRevert(abi.encodeWithSelector(FPISLocker.FxsConversionNotActive.selector, initialTimestamp, lockedFPIS.FXS_CONVERSION_START_TIMESTAMP()));
         hoax(alice);
         lockedFPIS.withdrawLockAsFxs(0);
         lockedFPIS.toggleContractPause();
@@ -1521,6 +1548,189 @@ contract Unit_Test_FPISLocker is BaseTestLFPIS {
         lockedFPIS.bulkWithdrawLockAsFxs(inputLockIndices);
     }
 
+    function test_GetLongestLock() public {
+        lockedFPISSetup();
+
+        uint128 numOfLocks = 8;
+        uint128 unlockTimestamp = uint128(((block.timestamp + uint128(WEEK * 2)) / uint128(WEEK)) * uint128(WEEK));
+        uint128 longestLockIndex;
+        LockedBalance memory lock;
+
+        for (uint128 i; i < numOfLocks;) {
+            token.mint(bob, 1000e18 * (i + 1));
+            hoax(bob);
+            token.approve(address(lockedFPIS), 1000e18 * (i + 1));
+            hoax(bob);
+            lockedFPIS.createLock(bob, 1000e18 * (i + 1), unlockTimestamp);
+
+            if (i == numOfLocks - 1) {
+                lock = LockedBalance({ amount: int128(1000e18 * (i + 1)), end: unlockTimestamp });
+                longestLockIndex = i;
+            }
+
+            unlockTimestamp += uint128(WEEK);
+
+            unchecked {
+                ++i;
+            }
+        }
+
+        (FPISLockerUtils.LockedBalance memory longestLock, uint128 retrievedLongestLockIndex) = fpisLockerUtils.getLongestLock(bob);
+
+        assertEq(retrievedLongestLockIndex, longestLockIndex);
+        assertEq(longestLock.amount, lock.amount);
+        assertEq(longestLock.end, lock.end);
+    }
+
+    function test_GetLongestLockBulk() public {
+        lockedFPISSetup();
+
+        address[] memory addresses = new address[](2);
+        addresses[0] = address(bob);
+        addresses[1] = address(alice);
+        uint128 firstNumOfLocks = 8;
+        uint128 secondNumOfLocks = 5;
+        uint128 unlockTimestamp = uint128(((block.timestamp + uint128(WEEK * 2)) / uint128(WEEK)) * uint128(WEEK));
+        LockedBalance memory firstLock;
+        LockedBalance memory secondLock;
+
+        for (uint128 i; i < firstNumOfLocks;) {
+            token.mint(bob, 1000e18 * (i + 1));
+            hoax(bob);
+            token.approve(address(lockedFPIS), 1000e18 * (i + 1));
+            hoax(bob);
+            lockedFPIS.createLock(bob, 1000e18 * (i + 1), unlockTimestamp);
+
+            if (i == firstNumOfLocks - 1) {
+                firstLock = LockedBalance({ amount: int128(1000e18 * (i + 1)), end: unlockTimestamp });
+            }
+
+            unlockTimestamp += uint128(WEEK);
+
+            unchecked {
+                ++i;
+            }
+        }
+
+        for (uint128 i; i < secondNumOfLocks;) {
+            token.mint(alice, 1000e18 * (i + 1));
+            hoax(alice);
+            token.approve(address(lockedFPIS), 1000e18 * (i + 1));
+            hoax(alice);
+            lockedFPIS.createLock(alice, 1000e18 * (i + 1), unlockTimestamp);
+
+            if (i == secondNumOfLocks - 1) {
+                secondLock = LockedBalance({ amount: int128(1000e18 * (i + 1)), end: unlockTimestamp });
+            }
+
+            unlockTimestamp += uint128(WEEK);
+
+            unchecked {
+                ++i;
+            }
+        }
+
+        FPISLockerUtils.LongestLock[] memory longestLocks = fpisLockerUtils.getLongestLockBulk(addresses);
+
+        assertEq(longestLocks.length, addresses.length);
+
+        assertEq(longestLocks[0].user, addresses[0]);
+        assertEq(longestLocks[1].user, addresses[1]);
+
+        assertEq(longestLocks[0].lockIndex, firstNumOfLocks - 1);
+        assertEq(longestLocks[1].lockIndex, secondNumOfLocks - 1);
+
+        assertEq(longestLocks[0].lock.amount, firstLock.amount);
+        assertEq(longestLocks[0].lock.end, firstLock.end);
+
+        assertEq(longestLocks[1].lock.amount, secondLock.amount);
+        assertEq(longestLocks[1].lock.end, secondLock.end);
+    }
+
+    function test_FPISLockerBulkGetAllLocksOf() public {
+        lockedFPISSetup();
+
+        address[] memory addresses = new address[](2);
+        addresses[0] = address(bob);
+        addresses[1] = address(alice);
+        uint128 firstNumOfLocks = 8;
+        uint128 secondNumOfLocks = 5;
+        uint128 unlockTimestamp = uint128(((block.timestamp + uint128(WEEK * 2)) / uint128(WEEK)) * uint128(WEEK));
+        LockedBalance[] memory firstLocks = new LockedBalance[](firstNumOfLocks);
+        LockedBalance[] memory secondLocks = new LockedBalance[](secondNumOfLocks);
+
+        console2.log("<<< createLocks #1 >>>");
+        for (uint128 i; i < firstNumOfLocks;) {
+            console2.log("  --- mint");
+            token.mint(bob, 1000e18 * (i + 1));
+            hoax(bob);
+            console2.log("  --- approve");
+            token.approve(address(lockedFPIS), 1000e18 * (i + 1));
+            hoax(bob);
+            console2.log("  --- createLock");
+            lockedFPIS.createLock(bob, 1000e18 * (i + 1), unlockTimestamp);
+            firstLocks[i] = LockedBalance({ amount: int128(1000e18 * (i + 1)), end: unlockTimestamp });
+            unlockTimestamp += uint128(WEEK);
+
+            unchecked {
+                ++i;
+            }
+        }
+
+        console2.log("<<< createLocks #2 >>>");
+        for (uint128 i; i < secondNumOfLocks;) {
+            console2.log("  --- mint");
+            token.mint(alice, 1000e18 * (i + 1));
+            hoax(alice);
+            console2.log("  --- approve");
+            token.approve(address(lockedFPIS), 1000e18 * (i + 1));
+            hoax(alice);
+            console2.log("  --- createLock");
+            lockedFPIS.createLock(alice, 1000e18 * (i + 1), unlockTimestamp);
+            secondLocks[i] = LockedBalance({ amount: int128(1000e18 * (i + 1)), end: unlockTimestamp });
+            unlockTimestamp += uint128(WEEK);
+
+            unchecked {
+                ++i;
+            }
+        }
+
+        console2.log("<<< getDetailedUserLockInfoBulk >>>");
+        DetailedUserLockInfo[] memory bulkLockInfos = lockedFPISUtils.getDetailedUserLockInfoBulk(addresses);
+
+        assertEq(bulkLockInfos.length, addresses.length);
+
+        assertEq(bulkLockInfos[0].user, addresses[0]);
+        assertEq(bulkLockInfos[1].user, addresses[1]);
+
+        assertEq(bulkLockInfos[0].numberOfLocks, firstNumOfLocks);
+        assertEq(bulkLockInfos[1].numberOfLocks, secondNumOfLocks);
+
+        LockedBalanceExtended[] memory retrievedFirstLocks = bulkLockInfos[0].allLocks;
+        LockedBalanceExtended[] memory retrievedSecondLocks = bulkLockInfos[1].allLocks;
+
+        assertEq(retrievedFirstLocks.length, firstLocks.length);
+        assertEq(retrievedSecondLocks.length, secondLocks.length);
+
+        for (uint128 i; i < firstLocks.length;) {
+            assertEq(retrievedFirstLocks[i].amount, firstLocks[i].amount);
+            assertEq(retrievedFirstLocks[i].end, firstLocks[i].end);
+
+            unchecked {
+                ++i;
+            }
+        }
+
+        for (uint128 i; i < secondLocks.length;) {
+            assertEq(retrievedSecondLocks[i].amount, secondLocks[i].amount);
+            assertEq(retrievedSecondLocks[i].end, secondLocks[i].end);
+
+            unchecked {
+                ++i;
+            }
+        }
+    }
+
     function testZach_IncorrectLockIndex() public {
         lockedFPISSetup();
         fxs.mint(address(lockedFPIS), 100e18);
@@ -1556,7 +1766,6 @@ contract Unit_Test_FPISLocker is BaseTestLFPIS {
 
     function testZach_EmergencyInflateBalance() public {
         lockedFPISSetup();
-        FPISLockerUtils lockerUtils = new FPISLockerUtils(address(lockedFPIS));
 
         vm.startPrank(bob);
         token.approve(address(lockedFPIS), 100e18);
@@ -1566,7 +1775,7 @@ contract Unit_Test_FPISLocker is BaseTestLFPIS {
 
         assertEq(lockedFPIS.balanceOf(bob), 33_870_719_970_826_908_826);
 
-        vm.prank(lockedFPIS.admin());
+        vm.prank(lockedFPIS.lockerAdmin());
         lockedFPIS.activateEmergencyUnlock();
 
         assertEq(lockedFPIS.balanceOf(bob), 33_300_000_000_000_000_000);

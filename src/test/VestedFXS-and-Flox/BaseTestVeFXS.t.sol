@@ -156,7 +156,7 @@ contract BaseTestVeFXS is FraxTest, IveFXSEvents, IveFXSStructs, Constants.Helpe
         // l1VeFXSTotalSupplyOracle.acceptOwnership();
 
         // Set the LockedFPIS admin to this contract
-        hoax(fpisLocker.admin());
+        hoax(fpisLocker.lockerAdmin());
         fpisLocker.commitTransferOwnership(address(this));
         fpisLocker.acceptTransferOwnership();
 

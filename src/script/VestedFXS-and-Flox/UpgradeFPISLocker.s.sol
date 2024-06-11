@@ -39,7 +39,7 @@ contract UpgradeFPISLocker is BaseScript {
 
         // Initialize the implementation
         implementation.initialize({
-            _admin: eventualAdmin,
+            _lockerAdmin: eventualAdmin,
             _fpisAggregator: fpisAggregator,
             _tokenAddr: token,
             _fxs: fxs,

@@ -34,7 +34,8 @@ import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 import { OwnedV2AutoMsgSender } from "./OwnedV2AutoMsgSender.sol";
-import "forge-std/console2.sol";
+
+// import "forge-std/console2.sol";
 
 contract YieldDistributor is OwnedV2AutoMsgSender, ReentrancyGuard, IveFXSStructs {
     using SafeERC20 for ERC20;
@@ -199,6 +200,9 @@ contract YieldDistributor is OwnedV2AutoMsgSender, ReentrancyGuard, IveFXSStruct
         lastUpdateTime = block.timestamp;
         rewardNotifiers[_owner] = true;
         yieldDuration = 604_800;
+
+        // Set the contract as initialized
+        wasInitialized = true;
     }
 
     // ==============================================================================
@@ -599,6 +603,8 @@ contract YieldDistributor is OwnedV2AutoMsgSender, ReentrancyGuard, IveFXSStruct
     /// @param _newTimelock The address of the timelock
     function setTimelock(address _newTimelock) external onlyByOwnGov {
         timelockAddress = _newTimelock;
+
+        emit TimelockChanged(_newTimelock);
     }
 
     // ==============================================================================
@@ -617,6 +623,10 @@ contract YieldDistributor is OwnedV2AutoMsgSender, ReentrancyGuard, IveFXSStruct
     /// @param reward Amount of tokens deposited
     /// @param yieldRate The resultant yield/emission rate
     event RewardAdded(uint256 reward, uint256 yieldRate);
+
+    /// @notice Emitted when the timelock address changes
+    /// @param timelock_address Address of the removed timelock
+    event TimelockChanged(address timelock_address);
 
     /// @notice When yield is collected
     /// @param staker Address whose rewards to collect

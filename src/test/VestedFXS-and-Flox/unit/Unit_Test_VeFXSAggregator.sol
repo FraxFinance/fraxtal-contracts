@@ -245,6 +245,17 @@ contract Unit_Test_VeFXSAggregator is BaseTestVeFXS {
         // Total fraction participating in the YD should be 100%
         assertEq(yieldDistributor.fractionParticipating(), 1e6, "Total fraction participating in the YD should be 100%");
 
+        // Check some other things
+        {
+            // For code coverage
+            address[] memory _addresses = veFXSAggregator.allAddlVeContractsAddresses();
+            assertEq(_addresses[0], address(addlVeFXS), "allAddlVeContractsAddresses should have address(addlVeFXS)");
+
+            // For code coverage
+            uint256 _length = veFXSAggregator.allAddlVeContractsLength();
+            assertEq(_length, 1, "allAddlVeContractsLength should be 1");
+        }
+
         // Print user locks
         printActiveLocks();
     }

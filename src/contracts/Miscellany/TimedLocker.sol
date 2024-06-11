@@ -26,7 +26,8 @@ import { Math } from "@openzeppelin/contracts/utils/math/Math.sol";
 import { OwnedV2 } from "./OwnedV2.sol";
 import { ReentrancyGuard } from "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 import { TransferHelper } from "src/contracts/VestedFXS-and-Flox/Flox/TransferHelper.sol";
-import "forge-std/console2.sol";
+
+// import "forge-std/console2.sol";
 
 contract TimedLocker is ERC20, OwnedV2, ReentrancyGuard {
     /* ========== STATE VARIABLES ========== */
@@ -207,10 +208,14 @@ contract TimedLocker is ERC20, OwnedV2, ReentrancyGuard {
             _rtnRewardsPerTokenStored = rewardsPerTokenStored;
         } else {
             // Loop through the reward tokens
-            for (uint256 i = 0; i < rewardTokens.length; i++) {
+            for (uint256 i = 0; i < rewardTokens.length; ) {
                 _rtnRewardsPerTokenStored[i] =
                     rewardsPerTokenStored[i] +
                     (((lastTimeRewardApplicable() - lastUpdateTime) * rewardRates[i] * 1e18) / totalSupply());
+
+                unchecked {
+                    ++i;
+                }
             }
         }
     }
@@ -226,10 +231,14 @@ contract TimedLocker is ERC20, OwnedV2, ReentrancyGuard {
         uint256[] memory _rtnRewardsPerToken = rewardPerToken();
 
         // Loop through the reward tokens
-        for (uint256 i = 0; i < rewardTokens.length; i++) {
+        for (uint256 i = 0; i < rewardTokens.length; ) {
             _rtnEarned[i] =
                 rewards[_account][i] +
                 ((balanceOf(_account) * ((_rtnRewardsPerToken[i] - userRewardsPerTokenPaid[_account][i]))) / 1e18);
+
+            unchecked {
+                ++i;
+            }
         }
     }
 
@@ -246,8 +255,12 @@ contract TimedLocker is ERC20, OwnedV2, ReentrancyGuard {
         uint256 _timeLeft = endingTimestamp - block.timestamp;
 
         // Calculate the duration rewards
-        for (uint256 i = 0; i < rewardTokens.length; i++) {
+        for (uint256 i = 0; i < rewardTokens.length; ) {
             _rtnRewardsRemaining[i] = rewardRates[i] * _timeLeft;
+
+            unchecked {
+                ++i;
+            }
         }
     }
 
@@ -293,8 +306,12 @@ contract TimedLocker is ERC20, OwnedV2, ReentrancyGuard {
         sync();
 
         // Loop through the users and sync them. Skip global sync() to save gas
-        for (uint256 i = 0; i < _users.length; i++) {
+        for (uint256 i = 0; i < _users.length; ) {
             _syncEarnedInner(_users[i]);
+
+            unchecked {
+                ++i;
+            }
         }
     }
 
@@ -325,9 +342,13 @@ contract TimedLocker is ERC20, OwnedV2, ReentrancyGuard {
             uint256[] memory _earneds = earned(_account);
 
             // Update the stake
-            for (uint256 i = 0; i < rewardTokens.length; i++) {
+            for (uint256 i = 0; i < rewardTokens.length; ) {
                 rewards[_account][i] = _earneds[i];
                 userRewardsPerTokenPaid[_account][i] = rewardsPerTokenStored[i];
+
+                unchecked {
+                    ++i;
+                }
             }
         }
     }
@@ -404,7 +425,7 @@ contract TimedLocker is ERC20, OwnedV2, ReentrancyGuard {
         _rtnRewards = new uint256[](rewardTokens.length);
 
         // Loop through the rewards
-        for (uint256 i = 0; i < rewardTokens.length; i++) {
+        for (uint256 i = 0; i < rewardTokens.length; ) {
             _rtnRewards[i] = rewards[msg.sender][i];
 
             // Do reward accounting
@@ -413,6 +434,10 @@ contract TimedLocker is ERC20, OwnedV2, ReentrancyGuard {
                 ERC20(rewardTokens[i]).transfer(_destinationAddress, _rtnRewards[i]);
 
                 emit RewardPaid(msg.sender, _rtnRewards[i], rewardTokens[i], _destinationAddress);
+            }
+
+            unchecked {
+                ++i;
             }
         }
 
@@ -430,17 +455,21 @@ contract TimedLocker is ERC20, OwnedV2, ReentrancyGuard {
         if (block.timestamp >= endingTimestamp) revert LockerHasEnded();
 
         // Pull in the reward tokens from the sender
-        for (uint256 i = 0; i < rewardTokens.length; i++) {
+        for (uint256 i = 0; i < rewardTokens.length; ) {
             // Handle the transfer of emission tokens via `transferFrom` to reduce the number
             // of transactions required and ensure correctness of the emission amount
             TransferHelper.safeTransferFrom(rewardTokens[i], msg.sender, address(this), _amounts[i]);
+
+            unchecked {
+                ++i;
+            }
         }
 
         // Update rewardsPerTokenStored and last update time
         sync();
 
         // Calculate the reward rate
-        for (uint256 i = 0; i < rewardTokens.length; i++) {
+        for (uint256 i = 0; i < rewardTokens.length; ) {
             // Account for unemitted tokens
             uint256 remainingTime = periodFinish - block.timestamp;
             uint256 leftoverRwd = remainingTime * rewardRates[i];
@@ -450,6 +479,10 @@ contract TimedLocker is ERC20, OwnedV2, ReentrancyGuard {
             rewardRates[i] = (_amounts[i] + leftoverRwd) / remainingTime;
 
             emit RewardAdded(rewardTokens[i], _amounts[i], rewardRates[i]);
+
+            unchecked {
+                ++i;
+            }
         }
 
         // Update rewardsPerTokenStored and last update time (again)

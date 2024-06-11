@@ -42,11 +42,11 @@ import { IveFXSStructs } from "./IveFXSStructs.sol";
 import { TransferHelper } from "../Flox/TransferHelper.sol";
 import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
-import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 import { OwnedV2AutoMsgSender } from "./OwnedV2AutoMsgSender.sol";
-import "forge-std/console2.sol";
 
-contract VeFXSAggregator is OwnedV2AutoMsgSender, ReentrancyGuard, IveFXSStructs {
+// import "forge-std/console2.sol";
+
+contract VeFXSAggregator is OwnedV2AutoMsgSender, IveFXSStructs {
     using SafeERC20 for ERC20;
 
     // ==============================================================================
@@ -161,6 +161,9 @@ contract VeFXSAggregator is OwnedV2AutoMsgSender, ReentrancyGuard, IveFXSStructs
             l1veFXS = IL1VeFXS(_veAddresses[4]);
             l1VeFXSTotalSupplyOracle = L1VeFXSTotalSupplyOracle(_veAddresses[5]);
         }
+
+        // Set the contract as initialized
+        wasInitialized = true;
     }
 
     // ==============================================================================
@@ -247,7 +250,7 @@ contract VeFXSAggregator is OwnedV2AutoMsgSender, ReentrancyGuard, IveFXSStructs
 
     /// @notice Array of all extra veFXS-like contracts
     /// @return _addresses The addresses
-    function allAddlVeContractsAddreses() external view returns (address[] memory _addresses) {
+    function allAddlVeContractsAddresses() external view returns (address[] memory _addresses) {
         return addlVeContractsArr;
     }
 
@@ -281,11 +284,15 @@ contract VeFXSAggregator is OwnedV2AutoMsgSender, ReentrancyGuard, IveFXSStructs
         }
 
         // (Optional) Get the total number of locks in the additional veFXS contracts
-        for (uint256 i = 0; i < addlVeContractsArr.length; i++) {
+        for (uint256 i = 0; i < addlVeContractsArr.length; ) {
             address _veAddr = addlVeContractsArr[i];
             if (_veAddr != address(0)) {
                 // Get the total number of locks
                 _maxArrSize += IVestedFXS(_veAddr).numLocks(_account);
+            }
+
+            unchecked {
+                ++i;
             }
         }
 
@@ -490,11 +497,15 @@ contract VeFXSAggregator is OwnedV2AutoMsgSender, ReentrancyGuard, IveFXSStructs
         }
 
         // (Optional) Get the total number of locks in the additional veFXS contracts
-        for (uint256 i = 0; i < addlVeContractsArr.length; i++) {
+        for (uint256 i = 0; i < addlVeContractsArr.length; ) {
             address _veAddr = addlVeContractsArr[i];
             if (_veAddr != address(0)) {
                 // Get the total number of locks
                 _maxArrSize += IVestedFXS(_veAddr).numLocks(_account);
+            }
+
+            unchecked {
+                ++i;
             }
         }
 
@@ -706,10 +717,10 @@ contract VeFXSAggregator is OwnedV2AutoMsgSender, ReentrancyGuard, IveFXSStructs
         // Future upgrade: remove this once full support is added and tested
         require(_veAddresses[0] != address(0), "veFXS must not be 0x0");
         require(_veAddresses[1] != address(0), "veFXSUtils must not be 0x0");
-        require(_veAddresses[2] != address(0), "Cannot add FPISLocker yet");
-        require(_veAddresses[3] != address(0), "Cannot add FPISLockerUtils yet");
-        require(_veAddresses[4] != address(0), "Cannot add L1VeFXS yet");
-        require(_veAddresses[5] != address(0), "Cannot add L1VeFXSTotalSupplyOracle yet");
+        require(_veAddresses[2] != address(0), "FPISLocker must not be 0x0");
+        require(_veAddresses[3] != address(0), "FPISLockerUtils must not be 0x0");
+        require(_veAddresses[4] != address(0), "L1VeFXS must not be 0x0");
+        require(_veAddresses[5] != address(0), "L1VeFXSTotalSupplyOracle must not be 0x0");
 
         // Set veFXS-like addresses
         veFXS = IVestedFXS(_veAddresses[0]);
@@ -732,6 +743,8 @@ contract VeFXSAggregator is OwnedV2AutoMsgSender, ReentrancyGuard, IveFXSStructs
     /// @param _newTimelock The address of the timelock
     function setTimelock(address _newTimelock) external onlyByOwnGov {
         timelockAddress = _newTimelock;
+
+        emit TimelockChanged(_newTimelock);
     }
 
     // ==============================================================================
@@ -758,6 +771,10 @@ contract VeFXSAggregator is OwnedV2AutoMsgSender, ReentrancyGuard, IveFXSStructs
     /// @param reward Amount of tokens deposited
     /// @param yieldRate The resultant yield/emission rate
     event RewardAdded(uint256 reward, uint256 yieldRate);
+
+    /// @notice Emitted when the timelock address changes
+    /// @param timelock_address Address of the removed timelock
+    event TimelockChanged(address timelock_address);
 
     /// @notice When yield is collected
     /// @param user Address collecting the yield
