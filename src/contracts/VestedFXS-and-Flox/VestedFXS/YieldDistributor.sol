@@ -293,6 +293,7 @@ contract YieldDistributor is OwnedV2AutoMsgSender, ReentrancyGuard, IveFXSStruct
         uint256 oldVefxsBalance = userVeFXSCheckpointed[_account];
         // console2.log("vefxsBalanceToUse: ", vefxsBalanceToUse);
         // console2.log("oldVefxsBalance: ", oldVefxsBalance);
+
         if (eligibleCurrentVefxs > oldVefxsBalance) {
             // VeFXS increased so use old amount
             vefxsBalanceToUse = oldVefxsBalance;

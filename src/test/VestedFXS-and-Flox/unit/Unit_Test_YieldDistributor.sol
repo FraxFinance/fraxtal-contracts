@@ -566,65 +566,99 @@ contract Unit_Test_YieldDistributor is BaseTestVeFXS {
     function test_onlySporadicRewards() public {
         setUp();
 
-        // Bob does a lock
-        hoax(bob);
-        vestedFXS.createLock(bob, 10e18, uint128(block.timestamp + (180 * DAY)));
+        // Set the total number of days to loop
+        uint256 NUM_DAYS = 100;
 
-        // Bob checkpoints on the YD
-        hoax(bob);
-        yieldDistributor.checkpoint();
+        // Loop one day at a time
+        for (uint256 currDay = 0; currDay < NUM_DAYS; currDay++) {
+            // Sync every 3 days, simulating general claimer activity
+            if (currDay % 3 == 0) yieldDistributor.sync();
 
-        // Wait 10 days
-        _warpToAndRollOne(block.timestamp + (10 * DAY));
+            // Day 0
+            if (currDay == 0) {
+                // Bob does a lock
+                hoax(bob);
+                vestedFXS.createLock(bob, 10e18, uint128(block.timestamp) + LOCK_SECONDS_2X);
 
-        // Notify a reward
-        token.approve(address(yieldDistributor), 1000e18);
-        yieldDistributor.notifyRewardAmount(7e18);
+                // Bob checkpoints on the YD
+                hoax(bob);
+                yieldDistributor.checkpoint();
 
-        // Wait a week
-        _warpToAndRollOne(block.timestamp + (7 * DAY));
+                // Verify that Bob is the only participant
+                assertApproxEqRel(yieldDistributor.totalVeFXSParticipating(), 20e18, 0.005e18, "Bob should be the only participant");
+            }
 
-        // Bob should have earned all of the yield
-        assertApproxEqRel(yieldDistributor.earned(bob), 7e18, 0.01e18, "Bob should have earned all of the yield");
+            // Wait 10 days
 
-        // Wait 3 days
-        _warpToAndRollOne(block.timestamp + (3 * DAY));
+            // Day 10
+            if (currDay == 10) {
+                // Notify a reward
+                token.approve(address(yieldDistributor), 1000e18);
+                yieldDistributor.notifyRewardAmount(7e18);
+            }
 
-        // Bob should have earned nothing extra
-        assertApproxEqRel(yieldDistributor.earned(bob), 7e18, 0.01e18, "Bob should have earned nothing extra");
+            // Wait a week
 
-        // Wait 18 days
-        _warpToAndRollOne(block.timestamp + (18 * DAY));
+            // Day 17
+            if (currDay == 17) {
+                // Bob should have earned all of the yield
+                assertApproxEqRel(yieldDistributor.earned(bob), 7e18, 0.005e18, "Bob should have earned all of the yield");
+            }
 
-        // Notify another reward, this time at double the rate
-        yieldDistributor.notifyRewardAmount(14e18);
+            // Wait 3 days
 
-        // Wait 1 day
-        _warpToAndRollOne(block.timestamp + (1 * DAY));
+            // Day 20
+            if (currDay == 20) {
+                // Bob should have earned nothing extra
+                assertApproxEqRel(yieldDistributor.earned(bob), 7e18, 0.005e18, "Bob should have earned nothing extra");
+            }
 
-        // Bob should have earned only 2 more FXS
-        assertApproxEqRel(yieldDistributor.earned(bob), 9e18, 0.01e18, "Bob should have earned 2 more FXS");
+            // Wait 18 days
 
-        // Wait 30 days
-        _warpToAndRollOne(block.timestamp + (30 * DAY));
+            // Day 38
+            if (currDay == 38) {
+                // Notify another reward, this time at double the initial rate
+                yieldDistributor.notifyRewardAmount(14e18);
+            }
 
-        // Bob should have earned 7 + 14 = 21
-        assertApproxEqRel(yieldDistributor.earned(bob), 21e18, 0.01e18, "Bob should have earned 21 FXS");
+            // Wait 1 day
 
-        // Notify another reward, this time at half the original rate
-        yieldDistributor.notifyRewardAmount(3.5e18);
+            // Day 39
+            if (currDay == 39) {
+                // Bob should have earned only 2 more FXS
+                assertApproxEqRel(yieldDistributor.earned(bob), 9e18, 0.005e18, "Bob should have earned 2 more FXS");
+            }
 
-        // Wait 2 days
-        _warpToAndRollOne(block.timestamp + (2 * DAY));
+            // Wait 30 days
 
-        // Bob should have earned 21 + 1 = 22
-        assertApproxEqRel(yieldDistributor.earned(bob), 22e18, 0.01e18, "Bob should have earned 22 FXS");
+            // Day 69
+            if (currDay == 69) {
+                // Bob should have earned 7 + 14 = 21 FXS total
+                assertApproxEqRel(yieldDistributor.earned(bob), 21e18, 0.005e18, "Bob should have earned 21 FXS total");
 
-        // Wait 60 days
-        _warpToAndRollOne(block.timestamp + (60 * DAY));
+                // Notify another reward, this time at half the original rate
+                yieldDistributor.notifyRewardAmount(3.5e18);
+            }
 
-        // Bob should have earned 22 + 2.5 = 24.5
-        assertApproxEqRel(yieldDistributor.earned(bob), 24.5e18, 0.01e18, "Bob should have earned 24.5 FXS");
+            // Wait 2 days
+
+            // Day 71
+            if (currDay == 71) {
+                // Bob should have earned 21 + 1 = 22 FXS total
+                assertApproxEqRel(yieldDistributor.earned(bob), 22e18, 0.005e18, "Bob should have earned 22 FXS total");
+            }
+
+            // Wait 60 days
+
+            // Day 131
+            if (currDay == 131) {
+                // Bob should have earned 22 + 2.5 = 24.5 FXS total
+                assertApproxEqRel(yieldDistributor.earned(bob), 24.5e18, 0.005e18, "Bob should have earned 24.5 FXS total");
+            }
+
+            // Advance one day
+            _warpToAndRollOne(block.timestamp + DAY);
+        }
     }
 
     function test_SetTimelock() public {
