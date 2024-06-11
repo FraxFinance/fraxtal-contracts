@@ -9,7 +9,7 @@
 6) In your `.env`, set FOUNDRY_PROFILE to the folder group you want to work with
 
 ## Test Example
-MAKE SURE TO SET YOUR `.env` `FOUNDRY_PROFILE="fraxtal"` or `FOUNDRY_PROFILE="vefxs"` or `FOUNDRY_PROFILE="miscellany"` DUE TO SOLC VERSIONING ISSUES, AS MENTIONED ABOVE
+MAKE SURE TO SET YOUR `.env` to `FOUNDRY_PROFILE="fraxtal"` or `FOUNDRY_PROFILE="vefxs"` or `FOUNDRY_PROFILE="miscellany"` DUE TO SOLC VERSIONING ISSUES, AS MENTIONED ABOVE
 ```clear && source .env && forge test --fork-url $MAINNET_RPC_URL --match-path ./src/test/VestedFXS-and-Flox/e2e/E2E_VeFXS.t.sol --match-contract Fuzz_MegaTest_VeFXS -vvvvv```
 
 ## Deploy Example
