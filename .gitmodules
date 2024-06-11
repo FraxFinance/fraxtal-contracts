@@ -1,0 +1,6 @@
+[submodule "lib/frax-standard-solidity"]
+	path = lib/frax-standard-solidity
+	url = https://github.com/FraxFinance/frax-standard-solidity
+[submodule "lib/optimism"]
+	path = lib/optimism
+	url = https://github.com/ethereum-optimism/optimism

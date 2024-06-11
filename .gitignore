@@ -1,0 +1,30 @@
+# Compiler files
+cache/
+out/
+
+# Ignores development broadcast logs
+/broadcast
+/broadcast/*/31337/
+/broadcast/**/dry-run/
+
+# Docs
+docs/
+
+# Dotenv file
+.env
+.env*
+.env.forge
+.env.test
+.env.save
+..env.swp
+
+# Go binaries
+scripts/go/bin/*
+
+#misc
+node_modules
+.DS_Store
+.vscode
+lcov.info
+report/
+.idea/

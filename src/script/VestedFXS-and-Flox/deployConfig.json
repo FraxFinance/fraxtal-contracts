@@ -1,0 +1,55 @@
+[
+  {
+    "type": "proxy-implementation",
+    "path": "src/script/DeployFraxchainL1Block.sol",
+    "deployContract": "DeployFraxchainL1Block",
+    "contracts": [
+      {
+        "address": "0xc0d3c0d3c0d3c0d3c0d3c0d3c0d3c0d3c0d30015",
+        "name": "FraxchainL1Block"
+      }
+    ]
+  },
+  {
+    "type": "contract",
+    "path": "src/script/DeployFraxchainL2ERC20s.sol",
+    "deployContract": "DeployFraxchainL2ERC20s",
+    "contracts": [
+      {
+        "address": "0xfc00000000000000000000000000000000000001",
+        "name": "Frax"
+      },
+      {
+        "address": "0xfc00000000000000000000000000000000000002",
+        "name": "Fxs"
+      },
+      {
+        "address": "0xfc00000000000000000000000000000000000003",
+        "name": "Fpi"
+      },
+      {
+        "address": "0xfc00000000000000000000000000000000000004",
+        "name": "Fpis"
+      },
+      {
+        "address": "0xfc00000000000000000000000000000000000005",
+        "name": "sfrxETH"
+      },
+      {
+        "address": "0xfc00000000000000000000000000000000000006",
+        "name": "wfrxETH"
+      }
+    ]
+  },
+  {
+    "type": "contract",
+    "path": "src/script/DeployMulticall3.sol",
+    "deployContract": "DeployMulticall3",
+    "contracts": [
+      {
+        "address": "0xcA11bde05977b3631167028862bE2a173976CA11",
+        "name": "Multicall3"
+      }
+    ]
+  }
+]

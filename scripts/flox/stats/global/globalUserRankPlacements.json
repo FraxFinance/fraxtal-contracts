@@ -1,0 +1,25 @@
+{
+  "lastEpoch": 0,
+  "users": [
+    {
+      "address": "0xb0e1650a9760e0f383174af042091fc544b8356f",
+      "rank": 0.7622082132437382,
+      "placement": 1
+    },
+    {
+      "address": "0xc6ef452b0de9e95ccb153c2a5a7a90154aab3419",
+      "rank": 0.14825663685474555,
+      "placement": 2
+    },
+    {
+      "address": "0xe7c147cd1a7c05a6e73217645547582024e87a9b",
+      "rank": 0.04988996789607863,
+      "placement": 3
+    },
+    {
+      "address": "0xa2b239d79a38d9837909fa545cfc1256074f0481",
+      "rank": 0.03964518200543761,
+      "placement": 4
+    }
+  ]
+}

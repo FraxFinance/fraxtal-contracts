@@ -1,0 +1,177 @@
+{
+  "users": {
+    "0xb0e1650a9760e0f383174af042091fc544b8356f": {
+      "totalGas": 3963721,
+      "totalFee": 18252952985292308,
+      "transactions": 1,
+      "contracts": {
+        "0x6ca98f43719231d38f6426db64c7f3d5c7ce7876": {
+          "totalGas": 3963721,
+          "totalFee": 18252952985292308,
+          "calls": 1
+        }
+      }
+    },
+    "0x339d413ccefd986b1b3647a9cfa9cbbe70a30749": {
+      "totalGas": 1602454,
+      "totalFee": 2348633086995612,
+      "transactions": 42,
+      "contracts": {
+        "0x3c2269811836af69497e5f486a85d7316753cf62": {
+          "totalGas": 1602454,
+          "totalFee": 2348633086995612,
+          "calls": 84
+        }
+      }
+    },
+    "0xb8ff877ed78ba520ece21b1de7843a8a57ca47cb": {
+      "totalGas": 2386032,
+      "totalFee": 3168738569281054,
+      "transactions": 24,
+      "contracts": {
+        "0x38de71124f7a447a01d67945a51edce9ff491251": {
+          "totalGas": 612864,
+          "totalFee": 813905549389657.8,
+          "calls": 24
+        },
+        "0x3a73033c0b1407574c76bdbac67f126f6b4a9aa9": {
+          "totalGas": 1773168,
+          "totalFee": 2354833019891396.5,
+          "calls": 24
+        }
+      }
+    },
+    "0xe93685f3bba03016f02bd1828badd6195988d950": {
+      "totalGas": 3518442,
+      "totalFee": 2798402353841674,
+      "transactions": 24,
+      "contracts": {
+        "0xc1b15d3b262beec0e3565c11c9e0f6134bdacb36": {
+          "totalGas": 126750,
+          "totalFee": 101108016192161.34,
+          "calls": 24
+        },
+        "0x6e55472109e6abe4054a8e8b8d9edffcb31032c5": {
+          "totalGas": 138360,
+          "totalFee": 98825483257058.8,
+          "calls": 4
+        },
+        "0xb6319cc6c8c27a8f5daf0dd3df91ea35c4720dd7": {
+          "totalGas": 453120,
+          "totalFee": 361209004079059.7,
+          "calls": 24
+        },
+        "0x38de71124f7a447a01d67945a51edce9ff491251": {
+          "totalGas": 858106,
+          "totalFee": 684098327115426,
+          "calls": 24
+        },
+        "0xa658742d33ebd2ce2f0bdff73515aa797fd161d9": {
+          "totalGas": 1380592,
+          "totalFee": 1095949506042853.9,
+          "calls": 48
+        },
+        "0xc072c3ebaf165955c5aad2dbb4293f771de6dbd3": {
+          "totalGas": 137604,
+          "totalFee": 108157826203729.38,
+          "calls": 24
+        },
+        "0x6f6ae8851a460406bbb3c929a415d2df9305acd5": {
+          "totalGas": 423910,
+          "totalFee": 349054190951384.75,
+          "calls": 20
+        }
+      }
+    },
+    "0x31562ae726afebe25417df01bedc72ef489f45b3": {
+      "totalGas": 5050945,
+      "totalFee": 22211047929319108,
+      "transactions": 4,
+      "contracts": {
+        "0x64f85076665dce1fbefc23391b8bfb2595c250f6": {
+          "totalGas": 595792,
+          "totalFee": 2539653667804220,
+          "calls": 1
+        },
+        "0x8c22ebc8f9b96ceac97ea21c53f3b27ef2f45e57": {
+          "totalGas": 1239425,
+          "totalFee": 5480182554175258,
+          "calls": 2
+        },
+        "0x4c3b0e85cd8c12e049e07d9a4d68c441196e6a12": {
+          "totalGas": 3215728,
+          "totalFee": 14191211707339630,
+          "calls": 1
+        }
+      }
+    }
+  },
+  "contracts": {
+    "0x6ca98f43719231d38f6426db64c7f3d5c7ce7876": {
+      "totalGas": 3963721,
+      "totalFee": 18252952985292308,
+      "calls": 1
+    },
+    "0x3c2269811836af69497e5f486a85d7316753cf62": {
+      "totalGas": 1602454,
+      "totalFee": 2348633086995612,
+      "calls": 84
+    },
+    "0x38de71124f7a447a01d67945a51edce9ff491251": {
+      "totalGas": 1470970,
+      "totalFee": 1498003876505083.8,
+      "calls": 48
+    },
+    "0x3a73033c0b1407574c76bdbac67f126f6b4a9aa9": {
+      "totalGas": 1773168,
+      "totalFee": 2354833019891396.5,
+      "calls": 24
+    },
+    "0xc1b15d3b262beec0e3565c11c9e0f6134bdacb36": {
+      "totalGas": 126750,
+      "totalFee": 101108016192161.34,
+      "calls": 24
+    },
+    "0x6e55472109e6abe4054a8e8b8d9edffcb31032c5": {
+      "totalGas": 138360,
+      "totalFee": 98825483257058.8,
+      "calls": 4
+    },
+    "0xb6319cc6c8c27a8f5daf0dd3df91ea35c4720dd7": {
+      "totalGas": 453120,
+      "totalFee": 361209004079059.7,
+      "calls": 24
+    },
+    "0xa658742d33ebd2ce2f0bdff73515aa797fd161d9": {
+      "totalGas": 1380592,
+      "totalFee": 1095949506042853.9,
+      "calls": 48
+    },
+    "0x64f85076665dce1fbefc23391b8bfb2595c250f6": {
+      "totalGas": 595792,
+      "totalFee": 2539653667804220,
+      "calls": 1
+    },
+    "0xc072c3ebaf165955c5aad2dbb4293f771de6dbd3": {
+      "totalGas": 137604,
+      "totalFee": 108157826203729.38,
+      "calls": 24
+    },
+    "0x6f6ae8851a460406bbb3c929a415d2df9305acd5": {
+      "totalGas": 423910,
+      "totalFee": 349054190951384.75,
+      "calls": 20
+    },
+    "0x8c22ebc8f9b96ceac97ea21c53f3b27ef2f45e57": {
+      "totalGas": 1239425,
+      "totalFee": 5480182554175258,
+      "calls": 2
+    },
+    "0x4c3b0e85cd8c12e049e07d9a4d68c441196e6a12": {
+      "totalGas": 3215728,
+      "totalFee": 14191211707339630,
+      "calls": 1
+    }
+  },
+  "blockLastBlock": 872990
+}

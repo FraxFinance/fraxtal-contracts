@@ -1,0 +1,513 @@
+{
+  "contractBalances": {
+    "0xa8c94ae38b04140794a9394b76ac6d0a83ac0b02": {
+      "type": "BigNumber",
+      "hex": "0x032ee0135e476a48"
+    },
+    "0x4c8d290a1b368ac4728d83a9e8321fc3af2b39b1": {
+      "type": "BigNumber",
+      "hex": "0x2386f26fc10000"
+    },
+    "0xe7c147cd1a7c05a6e73217645547582024e87a9b": {
+      "type": "BigNumber",
+      "hex": "0x78020735b1b64e"
+    },
+    "0xa1ebb6a4b856df8bf6c3aca88a9115a9ab3b2e02": {
+      "type": "BigNumber",
+      "hex": "0x00"
+    },
+    "0xba76c6980428a0b10cfc5d8ccb61949677a61233": {
+      "type": "BigNumber",
+      "hex": "0x027a2da2f0086ce0"
+    },
+    "0xeb8cda7c8b7146535f8c63a2e0da4500bdb1a4ec": {
+      "type": "BigNumber",
+      "hex": "0x2386f26fc10000"
+    },
+    "0x7d44339b5453660f061f555f10cb97664d32243a": {
+      "type": "BigNumber",
+      "hex": "0x00"
+    },
+    "0xa12bc993d8144404a8c8c812816048275a066ced": {
+      "type": "BigNumber",
+      "hex": "0x00"
+    },
+    "0x87fc4b27385bb4e69a40027931229d74ef4d1943": {
+      "type": "BigNumber",
+      "hex": "0x00"
+    },
+    "0xf50ab9c194f44eb3fd1bd1e6ca5674aaed4d9bc4": {
+      "type": "BigNumber",
+      "hex": "0x00"
+    },
+    "0xbdf0d870d8f834bf3d8c3a0d3b4b954094146efa": {
+      "type": "BigNumber",
+      "hex": "0x00"
+    },
+    "0x88a1ee1f7d5906d0de3105ba33e2247fea690c40": {
+      "type": "BigNumber",
+      "hex": "0x00"
+    },
+    "0x56ee6177e302be90707585f386c1dca87f9e3987": {
+      "type": "BigNumber",
+      "hex": "0x00"
+    },
+    "0x9a99cec3ba8a45fd07185862fdd7d2e984497bae": {
+      "type": "BigNumber",
+      "hex": "0x00"
+    },
+    "0x1627032b634131a2d39b5b0de257c83f05e17196": {
+      "type": "BigNumber",
+      "hex": "0x00"
+    },
+    "0xb78ebe401b54849ce9c829d1236328d16f2ebcfc": {
+      "type": "BigNumber",
+      "hex": "0x00"
+    },
+    "0x06dce0c05351ae31c3ccb5d34e4aee61611beaaf": {
+      "type": "BigNumber",
+      "hex": "0x00"
+    },
+    "0xb433f98ab4da08cb8b4e4aea0e103e0ac26dd283": {
+      "type": "BigNumber",
+      "hex": "0x00"
+    },
+    "0x3a590226f4069ec7fb4c6b72cbf0fd6ada4f0328": {
+      "type": "BigNumber",
+      "hex": "0x00"
+    },
+    "0x1e469c6e9a776ae15409c485caf306c06df8cf5f": {
+      "type": "BigNumber",
+      "hex": "0x00"
+    },
+    "0x0a64a5d92d94cd5a57bea056650d81abfa9c5591": {
+      "type": "BigNumber",
+      "hex": "0x00"
+    },
+    "0x763e51296e3ac7baa69e2cbc384dbde22e72c327": {
+      "type": "BigNumber",
+      "hex": "0x00"
+    },
+    "0x81cf89b37a48551b6ffedcc35d799e04af1a20aa": {
+      "type": "BigNumber",
+      "hex": "0x00"
+    },
+    "0x76e66d278f3603bcd3bc192e0569e65bf5c187b6": {
+      "type": "BigNumber",
+      "hex": "0x00"
+    },
+    "0x3d9242bdea9f8ff55bf6717e7d1652774f1e7ed6": {
+      "type": "BigNumber",
+      "hex": "0x00"
+    },
+    "0x86bf6a161588bf308d600830a58ef69b57b65428": {
+      "type": "BigNumber",
+      "hex": "0x00"
+    },
+    "0x20fce7977a6cdd94d114dcf90f21a4f9af80f78c": {
+      "type": "BigNumber",
+      "hex": "0x00"
+    },
+    "0x5c5b63c823bf4009b183515f659dad36f7c2b0c3": {
+      "type": "BigNumber",
+      "hex": "0x00"
+    },
+    "0x263b919dac4df7c976d0c8cf2153a0328cbe3c08": {
+      "type": "BigNumber",
+      "hex": "0x00"
+    },
+    "0xbdb235d35232f4ff25a7968cd6e7149231fb47ce": {
+      "type": "BigNumber",
+      "hex": "0x00"
+    },
+    "0xe3c4c47685974b704bca0def8edd4898155e2b6e": {
+      "type": "BigNumber",
+      "hex": "0x00"
+    },
+    "0x138e0d2aad08bdd55e7ba1ba07f74f69cddf9407": {
+      "type": "BigNumber",
+      "hex": "0x00"
+    },
+    "0xd680db0f7e932f5f2505d60e8cd6687a0f808ce8": {
+      "type": "BigNumber",
+      "hex": "0x00"
+    },
+    "0x4d224153eec106ab73114d5b8365d9af05c432f1": {
+      "type": "BigNumber",
+      "hex": "0x00"
+    },
+    "0x8bf3ddd43f627be77364d3355a19853eb2db21ab": {
+      "type": "BigNumber",
+      "hex": "0x00"
+    },
+    "0xb5add58879d7975c1f7f51460ebf5df95cadb055": {
+      "type": "BigNumber",
+      "hex": "0x00"
+    },
+    "0x1238a965950695b0d839ea47123cd8885649d468": {
+      "type": "BigNumber",
+      "hex": "0x00"
+    },
+    "0xff1af6f79feea0763efdf339b88d6a3ab66977a7": {
+      "type": "BigNumber",
+      "hex": "0x00"
+    },
+    "0x5d100edeeaf92463f576821c3f1e1046b94263e2": {
+      "type": "BigNumber",
+      "hex": "0x00"
+    },
+    "0x12d68cf22019dfde54e2f00a80ceff7f180884df": {
+      "type": "BigNumber",
+      "hex": "0x00"
+    },
+    "0xc3f942d20ff670e114507e36d9f31265391859f0": {
+      "type": "BigNumber",
+      "hex": "0x00"
+    },
+    "0xb0544dce659ddf702f1823815a1a1fa8100dc65d": {
+      "type": "BigNumber",
+      "hex": "0x00"
+    },
+    "0x9cb8710332f63296e77d612ea9d8de4dc1a1cf5e": {
+      "type": "BigNumber",
+      "hex": "0x00"
+    },
+    "0xa0f58e5f59e0b466a7c328d75ef07e5a64e64b73": {
+      "type": "BigNumber",
+      "hex": "0x00"
+    },
+    "0x876e3df736860948ad7acc34f28b2ec85dc9bf73": {
+      "type": "BigNumber",
+      "hex": "0x00"
+    },
+    "0xf7656410c805cbe55b141755142714f2e7529c5d": {
+      "type": "BigNumber",
+      "hex": "0x00"
+    },
+    "0x3d2b441634456442a39c27d26eda0f31e76a8c42": {
+      "type": "BigNumber",
+      "hex": "0x00"
+    },
+    "0x1153c7468bd2a7af7f5f3474962d0f1044de722c": {
+      "type": "BigNumber",
+      "hex": "0x00"
+    },
+    "0xf69889805f6ef91655c11ee90cef999b704d9ff6": {
+      "type": "BigNumber",
+      "hex": "0x00"
+    },
+    "0xe48c5a26e3dc684b705b02e7445be447dada05c7": {
+      "type": "BigNumber",
+      "hex": "0x00"
+    },
+    "0x8754f19b00ef548dd656a8b7db74e14586d8f58b": {
+      "type": "BigNumber",
+      "hex": "0x00"
+    },
+    "0xc399f190cb5da949496381e509346894160edc69": {
+      "type": "BigNumber",
+      "hex": "0x00"
+    },
+    "0xa548afa249d302213f8bb2b87dd78ea98fe9692d": {
+      "type": "BigNumber",
+      "hex": "0x00"
+    },
+    "0xb495c193c9d674013a08fd8054abb0db1cef39bc": {
+      "type": "BigNumber",
+      "hex": "0x00"
+    },
+    "0xaafacfbd6f5d779f4d8f4d63baacff597ab3fcfe": {
+      "type": "BigNumber",
+      "hex": "0x00"
+    },
+    "0xe1696dde1b0b50a8eb3519fe2aeb3a17f57b55c0": {
+      "type": "BigNumber",
+      "hex": "0x00"
+    },
+    "0xdaf7032d11b60d468d478defc5c3da26c79e585a": {
+      "type": "BigNumber",
+      "hex": "0x00"
+    },
+    "0x8596af2f3fa677d4915bd2f7925d3c9223655d7d": {
+      "type": "BigNumber",
+      "hex": "0x00"
+    },
+    "0xde5a027710aa4c8391cae0e3788095a1e6c276c0": {
+      "type": "BigNumber",
+      "hex": "0x00"
+    },
+    "0x6ee6f157199486aaf7c7a6b40c4614d9488cadba": {
+      "type": "BigNumber",
+      "hex": "0x00"
+    },
+    "0x293e250b0c058bdbb89667f97ac3b2e9feab911d": {
+      "type": "BigNumber",
+      "hex": "0x00"
+    },
+    "0x7a7a76fcf6b5767a127d524007dadd2c1382f228": {
+      "type": "BigNumber",
+      "hex": "0x00"
+    },
+    "0x93540654402a2e18a1b5c9857898871d5298c0ee": {
+      "type": "BigNumber",
+      "hex": "0x00"
+    },
+    "0x272795013ef6b702570e88d643d87fb6af552c92": {
+      "type": "BigNumber",
+      "hex": "0x00"
+    },
+    "0x74f23050f32962ae97bea6b4b47bf81f3dd9244f": {
+      "type": "BigNumber",
+      "hex": "0x00"
+    },
+    "0x570356341b35db71114dd99c4641b5b7e21d8dc7": {
+      "type": "BigNumber",
+      "hex": "0x00"
+    },
+    "0x2e7a3c96c781b613675ac32430a8b4fba3012b54": {
+      "type": "BigNumber",
+      "hex": "0x00"
+    },
+    "0xca905224386f83e9d088a449fd2cd93ef9d88fa7": {
+      "type": "BigNumber",
+      "hex": "0x00"
+    },
+    "0xad19e5ec15cd86c27ba6e54f5ff5753fa8b63292": {
+      "type": "BigNumber",
+      "hex": "0x00"
+    },
+    "0x68331c7a103055fe3dd5141f258cc7376b03cfa2": {
+      "type": "BigNumber",
+      "hex": "0x00"
+    },
+    "0x622b2932c1d04493909e0c4d2363e8cc44ad3ef1": {
+      "type": "BigNumber",
+      "hex": "0x00"
+    },
+    "0x7f2a938f6d1852872e2bb59572208dc73f990e78": {
+      "type": "BigNumber",
+      "hex": "0x00"
+    },
+    "0x3e5ca3f2e73c25171a8dc3ce9a0eb30b1e2c3b06": {
+      "type": "BigNumber",
+      "hex": "0x00"
+    },
+    "0x4e85c6ae9770e19d9878b349c98ac29498d546b3": {
+      "type": "BigNumber",
+      "hex": "0x00"
+    },
+    "0xc87f5ef769d63236dd5b2b9b79fbacae8d541837": {
+      "type": "BigNumber",
+      "hex": "0x00"
+    },
+    "0x6b8d22692985e238eb20b47c32bea34bd4c9c107": {
+      "type": "BigNumber",
+      "hex": "0x00"
+    },
+    "0x947b7742c403f20e5faccdac5e092c943e7d0277": {
+      "type": "BigNumber",
+      "hex": "0x07b860fbff20b898"
+    },
+    "0x8dcba0fdc0853095791e6a8d9ec89c66c2028881": {
+      "type": "BigNumber",
+      "hex": "0x00"
+    },
+    "0x124e37ca2439b52fc6bf90a04cb8021c639bf781": {
+      "type": "BigNumber",
+      "hex": "0x00"
+    },
+    "0x07202292009dec5ea9b99c7005dc8e3ce05bfb73": {
+      "type": "BigNumber",
+      "hex": "0x00"
+    },
+    "0x6a226cfb5d66e71757c4eb7066d75031da9955d0": {
+      "type": "BigNumber",
+      "hex": "0x00"
+    },
+    "0x372516d2f464907d9fc7953f966d033803096b7a": {
+      "type": "BigNumber",
+      "hex": "0x00"
+    },
+    "0x989aeb4d175e16225e39e87d0d97a3360524ad80": {
+      "type": "BigNumber",
+      "hex": "0x00"
+    },
+    "0x4e3fbd56cd56c3e72c1403e103b45db9da5b9d2b": {
+      "type": "BigNumber",
+      "hex": "0x00"
+    },
+    "0xf403c135812408bfbe8713b5a23a04b3d48aae31": {
+      "type": "BigNumber",
+      "hex": "0x00"
+    },
+    "0x62b9c7356a2dc64a1969e19c23e4f579f9810aa7": {
+      "type": "BigNumber",
+      "hex": "0x00"
+    },
+    "0xa46944d0845f786117d0e1034fc10585747c861b": {
+      "type": "BigNumber",
+      "hex": "0x00"
+    },
+    "0x3e342768feaa34c88429de9429a2d9150b9e6db6": {
+      "type": "BigNumber",
+      "hex": "0x00"
+    },
+    "0xfc0a2ffdea23804494aa1707741e5a6eaa2f8017": {
+      "type": "BigNumber",
+      "hex": "0x00"
+    },
+    "0xcf50b810e57ac33b91dcf525c6ddd9881b139332": {
+      "type": "BigNumber",
+      "hex": "0x00"
+    },
+    "0x3b2d30734491ad77880d31e8afe2a4d8ac135a9c": {
+      "type": "BigNumber",
+      "hex": "0x00"
+    },
+    "0xe029881c3277b7b4935781b3d9fa0fe7ec4177cd": {
+      "type": "BigNumber",
+      "hex": "0x00"
+    },
+    "0x25e12482a25cf36ec70fda2a09c1ed077fc21616": {
+      "type": "BigNumber",
+      "hex": "0x00"
+    },
+    "0xf5dccd4cc45e1c3397a80babaa1071f556539776": {
+      "type": "BigNumber",
+      "hex": "0x00"
+    },
+    "0xca35c3fe456a87e6ce7827d1d784741613463204": {
+      "type": "BigNumber",
+      "hex": "0x00"
+    },
+    "0x1abf1f891790788c925afd4a5df7f6abc66a6c5f": {
+      "type": "BigNumber",
+      "hex": "0x00"
+    },
+    "0x40cb6360a3f79cab1cd3033abf3b22b579187a10": {
+      "type": "BigNumber",
+      "hex": "0x00"
+    },
+    "0x930811b82da359bcd8529e83bf22062747581066": {
+      "type": "BigNumber",
+      "hex": "0x00"
+    },
+    "0x0fe38dcc905ec14f6099a83ac5c93bf2601300cf": {
+      "type": "BigNumber",
+      "hex": "0x00"
+    },
+    "0xca8d0747b5573d69653c3ac22242e6341c36e4b4": {
+      "type": "BigNumber",
+      "hex": "0x00"
+    },
+    "0xefaddde5b43917ccc738ade6962295a0b343f7ce": {
+      "type": "BigNumber",
+      "hex": "0x00"
+    },
+    "0xd6681e74eea20d196c15038c580f721ef2ab6320": {
+      "type": "BigNumber",
+      "hex": "0x00"
+    },
+    "0x69522fb5337663d3b4dfb0030b881c1a750adb4f": {
+      "type": "BigNumber",
+      "hex": "0x00"
+    },
+    "0x4f37a9d177470499a2dd084621020b023fcffc1f": {
+      "type": "BigNumber",
+      "hex": "0x00"
+    },
+    "0x8b3efbefa6ed222077455d6f0dcda3bf4f3f57a6": {
+      "type": "BigNumber",
+      "hex": "0x00"
+    },
+    "0x506f594ceb4e33f5161139bae3ee911014df9f7f": {
+      "type": "BigNumber",
+      "hex": "0x00"
+    },
+    "0x87fe17697d0f14a222e8bef386a0860ecffdd617": {
+      "type": "BigNumber",
+      "hex": "0x00"
+    },
+    "0x1764ee18e8b3cca4787249ceb249356192594585": {
+      "type": "BigNumber",
+      "hex": "0x00"
+    },
+    "0x5eee3091f747e60a045a2e715a4c71e600e31f6e": {
+      "type": "BigNumber",
+      "hex": "0x00"
+    },
+    "0xd2002373543ce3527023c75e7518c274a51ce712": {
+      "type": "BigNumber",
+      "hex": "0x00"
+    },
+    "0xe61fb97ef6ebfba12b36ffd7be785c1f5a2de66b": {
+      "type": "BigNumber",
+      "hex": "0x00"
+    },
+    "0x2005995a71243be9fb995dab4742327dc76564df": {
+      "type": "BigNumber",
+      "hex": "0x00"
+    },
+    "0x13b0d85ccb8bf860b6b79af3029fca081ae9bef2": {
+      "type": "BigNumber",
+      "hex": "0x00"
+    },
+    "0x07cdebf81977e111b08c126defa07818d0045b80": {
+      "type": "BigNumber",
+      "hex": "0x00"
+    },
+    "0x04fd6bec7d45efa99a27d29fb94b55c56dd07223": {
+      "type": "BigNumber",
+      "hex": "0x00"
+    },
+    "0x98ee851a00abee0d95d08cf4ca2bdce32aeaaf7f": {
+      "type": "BigNumber",
+      "hex": "0x00"
+    },
+    "0x0c9d8c7e486e822c29488ff51bff0167b4650953": {
+      "type": "BigNumber",
+      "hex": "0x00"
+    },
+    "0x64379c265fc6595065d7d835aaaa731c0584db80": {
+      "type": "BigNumber",
+      "hex": "0x00"
+    },
+    "0xd3b17f862956464ae4403ccf829ce69199856e1e": {
+      "type": "BigNumber",
+      "hex": "0x00"
+    },
+    "0x1a83348f9ccfd3fe1a8c0adba580ac4e267fe495": {
+      "type": "BigNumber",
+      "hex": "0x00"
+    },
+    "0xc9fe0c63af9a39402e8a5514f9c43af0322b665f": {
+      "type": "BigNumber",
+      "hex": "0x00"
+    },
+    "0x92e606fd8b99f99928f690a5beb20f6f6e3ec0f3": {
+      "type": "BigNumber",
+      "hex": "0x00"
+    },
+    "0x01480a0c134cecc309015a564c7e292ba6e0f358": {
+      "type": "BigNumber",
+      "hex": "0x00"
+    },
+    "0x1a60b40601bb5aa192389b05f80a7beade6d77d7": {
+      "type": "BigNumber",
+      "hex": "0x00"
+    },
+    "0x5c845cab3f05958b965a88139c0cc885aaaa4b3e": {
+      "type": "BigNumber",
+      "hex": "0x00"
+    },
+    "0x93bc2e4061d4b256eb55446952b49c616db4ac0e": {
+      "type": "BigNumber",
+      "hex": "0x00"
+    },
+    "0x9f403140bc0574d7d36ea472b82daa1bbd4ef327": {
+      "type": "BigNumber",
+      "hex": "0x00"
+    }
+  },
+  "blockNumber": 540545
+}

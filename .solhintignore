@@ -1,0 +1,4 @@
+# directories
+**/artifacts
+**/node_modules
+src/test/**/*.sol

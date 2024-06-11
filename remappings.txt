@@ -1,0 +1,4 @@
+frax-std/=lib/frax-standard-solidity/src/
+@eth-optimism/=lib/optimism/packages/
+lib/optimism/packages/contracts-bedrock:src/=lib/optimism/packages/contracts-bedrock/src
+src/=src/

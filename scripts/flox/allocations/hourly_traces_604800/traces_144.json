@@ -1,0 +1,140 @@
+{
+  "users": {
+    "0xb8ff877ed78ba520ece21b1de7843a8a57ca47cb": {
+      "totalGas": 3678524,
+      "totalFee": 6286322168746880,
+      "transactions": 37,
+      "contracts": {
+        "0x38de71124f7a447a01d67945a51edce9ff491251": {
+          "totalGas": 944832,
+          "totalFee": 1614645259006257.8,
+          "calls": 37
+        },
+        "0x3a73033c0b1407574c76bdbac67f126f6b4a9aa9": {
+          "totalGas": 2733692,
+          "totalFee": 4671676909740623,
+          "calls": 37
+        }
+      }
+    },
+    "0x339d413ccefd986b1b3647a9cfa9cbbe70a30749": {
+      "totalGas": 2167902,
+      "totalFee": 4016059451870842,
+      "transactions": 57,
+      "contracts": {
+        "0x3c2269811836af69497e5f486a85d7316753cf62": {
+          "totalGas": 2167902,
+          "totalFee": 4016059451870841,
+          "calls": 114
+        }
+      }
+    },
+    "0xe93685f3bba03016f02bd1828badd6195988d950": {
+      "totalGas": 5448027,
+      "totalFee": 5549162279132544,
+      "transactions": 37,
+      "contracts": {
+        "0xc1b15d3b262beec0e3565c11c9e0f6134bdacb36": {
+          "totalGas": 196097,
+          "totalFee": 201676751958523.16,
+          "calls": 37
+        },
+        "0x6f6ae8851a460406bbb3c929a415d2df9305acd5": {
+          "totalGas": 566114,
+          "totalFee": 667175457555524.6,
+          "calls": 28
+        },
+        "0xb6319cc6c8c27a8f5daf0dd3df91ea35c4720dd7": {
+          "totalGas": 698585,
+          "totalFee": 713447710674591.6,
+          "calls": 37
+        },
+        "0x38de71124f7a447a01d67945a51edce9ff491251": {
+          "totalGas": 1323515,
+          "totalFee": 1352763937872553.5,
+          "calls": 37
+        },
+        "0xa658742d33ebd2ce2f0bdff73515aa797fd161d9": {
+          "totalGas": 2111410,
+          "totalFee": 2087361004795070.8,
+          "calls": 74
+        },
+        "0xc072c3ebaf165955c5aad2dbb4293f771de6dbd3": {
+          "totalGas": 206406,
+          "totalFee": 187756132473270.72,
+          "calls": 36
+        },
+        "0x6e55472109e6abe4054a8e8b8d9edffcb31032c5": {
+          "totalGas": 345900,
+          "totalFee": 338981283803010.8,
+          "calls": 10
+        }
+      }
+    },
+    "0xc13b65f7c53cd6db2ea205a4b574b4a0858720a6": {
+      "totalGas": 442931,
+      "totalFee": 1457950945772684,
+      "transactions": 1,
+      "contracts": {
+        "0x1d186c560281b8f1af831957ed5047fd3ab902f9": {
+          "totalGas": 442931,
+          "totalFee": 1457950945772684,
+          "calls": 1
+        }
+      }
+    }
+  },
+  "contracts": {
+    "0x38de71124f7a447a01d67945a51edce9ff491251": {
+      "totalGas": 2268347,
+      "totalFee": 2967409196878810.5,
+      "calls": 74
+    },
+    "0x3a73033c0b1407574c76bdbac67f126f6b4a9aa9": {
+      "totalGas": 2733692,
+      "totalFee": 4671676909740623,
+      "calls": 37
+    },
+    "0x3c2269811836af69497e5f486a85d7316753cf62": {
+      "totalGas": 2167902,
+      "totalFee": 4016059451870841,
+      "calls": 114
+    },
+    "0xc1b15d3b262beec0e3565c11c9e0f6134bdacb36": {
+      "totalGas": 196097,
+      "totalFee": 201676751958523.16,
+      "calls": 37
+    },
+    "0x6f6ae8851a460406bbb3c929a415d2df9305acd5": {
+      "totalGas": 566114,
+      "totalFee": 667175457555524.6,
+      "calls": 28
+    },
+    "0xb6319cc6c8c27a8f5daf0dd3df91ea35c4720dd7": {
+      "totalGas": 698585,
+      "totalFee": 713447710674591.6,
+      "calls": 37
+    },
+    "0xa658742d33ebd2ce2f0bdff73515aa797fd161d9": {
+      "totalGas": 2111410,
+      "totalFee": 2087361004795070.8,
+      "calls": 74
+    },
+    "0xc072c3ebaf165955c5aad2dbb4293f771de6dbd3": {
+      "totalGas": 206406,
+      "totalFee": 187756132473270.72,
+      "calls": 36
+    },
+    "0x6e55472109e6abe4054a8e8b8d9edffcb31032c5": {
+      "totalGas": 345900,
+      "totalFee": 338981283803010.8,
+      "calls": 10
+    },
+    "0x1d186c560281b8f1af831957ed5047fd3ab902f9": {
+      "totalGas": 442931,
+      "totalFee": 1457950945772684,
+      "calls": 1
+    }
+  },
+  "blockLastBlock": 865790
+}

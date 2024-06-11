@@ -1,0 +1,67 @@
+[
+  {
+    "address": "0x071aafb1906897763f26c74a6660be4cd8b80051",
+    "totalGas": 105000,
+    "rank": 1
+  },
+  {
+    "address": "0xa8c94ae38b04140794a9394b76ac6d0a83ac0b02",
+    "totalGas": 21000,
+    "rank": 2
+  },
+  {
+    "address": "0xe7c147cd1a7c05a6e73217645547582024e87a9b",
+    "totalGas": 42000,
+    "rank": 3
+  },
+  {
+    "address": "0xba76c6980428a0b10cfc5d8ccb61949677a61233",
+    "totalGas": 125245903,
+    "rank": 4
+  },
+  {
+    "address": "0x947b7742c403f20e5faccdac5e092c943e7d0277",
+    "totalGas": 18804980,
+    "rank": 5
+  },
+  {
+    "address": "0xb0e1650a9760e0f383174af042091fc544b8356f",
+    "totalGas": 1835686,
+    "rank": 6
+  },
+  {
+    "address": "0x8688515028955734350067695939423222009623",
+    "totalGas": 163836,
+    "rank": 7
+  },
+  {
+    "address": "0x6edac7c2aaed7b0a455249aaf5be8b6b1597f8e1",
+    "totalGas": 211550,
+    "rank": 8
+  },
+  {
+    "address": "0xe6b328e141ef304739892a864cebfe148a04353e",
+    "totalGas": 12421104,
+    "rank": 9
+  },
+  {
+    "address": "0x2d12d0907a388811e3aa855a550f959501d303ee",
+    "totalGas": 44350054,
+    "rank": 10
+  },
+  {
+    "address": "0x31562ae726afebe25417df01bedc72ef489f45b3",
+    "totalGas": 4457967,
+    "rank": 11
+  },
+  {
+    "address": "0x6e74053a3798e0fc9a9775f7995316b27f21c4d2",
+    "totalGas": 21000,
+    "rank": 12
+  },
+  {
+    "address": "0xbaeb92889696217a3a6be2175e5a95dc4cffc9f7",
+    "totalGas": 21000,
+    "rank": 13
+  }
+]

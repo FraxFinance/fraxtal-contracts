@@ -1,0 +1,173 @@
+# To easily switch between profiles add the following to your
+# .bashrc or .zshrc: function profile() { FOUNDRY_PROFILE=$1 "${@:2}" }
+# Then you can invoke like this: `profile test forge build -w`
+
+# See more config options https://github.com/foundry-rs/foundry/tree/master/config
+
+[profile.default]
+# The source directory
+src = 'src/contracts'
+# the test directory
+test = 'src/test'
+# The artifact directory
+out = 'out'
+# The script directory
+script = "src/script"
+# A list of paths to look for libraries in
+libs = ['lib', 'node_modules']
+# Whether or not to enable `vm.ffi`
+ffi = true
+# Enables or disables the optimizer
+optimizer = true
+# The number of optimizer runs
+optimizer_runs = 200 # increase to 1000000 on deploy
+# use the via-ir compiler flag
+via_ir = false
+# include metadata hash in bytecode
+#bytecode_hash = "none"
+# Whether to append the metadata hash to the bytecode
+#cbor_metadata = false
+# evm version (needed until all chains support PUSH0)
+#evm_version = "paris"
+# Contracts to track with --gas-report
+#gas_reports = []
+ignored_error_codes = [1878, 2519, 5574, 5667, 2462, 2072, 2018, 3420, 9302, 3628, 8417]
+
+[profile.fraxtal]
+# The source directory
+src = 'src/contracts/Fraxtal'
+# the test directory
+test = 'src/test/Fraxtal'
+# The artifact directory
+out = 'out'
+# The script directory
+script = "src/script/Fraxtal"
+# A list of paths to look for libraries in
+libs = ['lib', 'node_modules']
+# Whether or not to enable `vm.ffi`
+ffi = true
+# Enables or disables the optimizer
+optimizer = true
+# The number of optimizer runs
+optimizer_runs = 10000 # increase to 1000000 on deploy
+# use the via-ir compiler flag
+via_ir = false
+# include metadata hash in bytecode
+#bytecode_hash = "none"
+# Whether to append the metadata hash to the bytecode
+#cbor_metadata = false
+# evm version (needed until all chains support PUSH0)
+#evm_version = "paris"
+# Contracts to track with --gas-report
+#gas_reports = []
+ignored_error_codes = [1878, 2519, 5574, 5667, 2462, 2072, 2018, 3420, 9302, 3628, 8417]
+
+[profile.miscellany]
+# The source directory
+src = 'src/contracts/Miscellany'
+# the test directory
+test = 'src/test/Miscellany'
+# The artifact directory
+out = 'out'
+# The script directory
+script = "src/script/Miscellany"
+# A list of paths to look for libraries in
+libs = ['lib', 'node_modules']
+# Whether or not to enable `vm.ffi`
+ffi = true
+# Enables or disables the optimizer
+optimizer = true
+# The number of optimizer runs
+optimizer_runs = 100000 # increase to 1000000 on deploy
+# use the via-ir compiler flag
+via_ir = false
+# include metadata hash in bytecode
+#bytecode_hash = "none"
+# Whether to append the metadata hash to the bytecode
+#cbor_metadata = false
+# evm version (needed until all chains support PUSH0)
+#evm_version = "paris"
+# Contracts to track with --gas-report
+#gas_reports = []
+ignored_error_codes = [1878, 2519, 5574, 5667, 2462, 2072, 2018, 3420, 9302, 3628, 8417]
+solc="0.8.26"
+
+[profile.vefxs]
+# The source directory
+src = 'src/contracts/VestedFXS-and-Flox'
+# the test directory
+test = 'src/test/VestedFXS-and-Flox'
+# The artifact directory
+out = 'out'
+# The script directory
+script = "src/script/VestedFXS-and-Flox"
+# A list of paths to look for libraries in
+libs = ['lib', 'node_modules']
+# Whether or not to enable `vm.ffi`
+ffi = true
+# Enables or disables the optimizer
+optimizer = true
+# The number of optimizer runs
+optimizer_runs = 100000 # increase to 1000000 on deploy
+# use the via-ir compiler flag
+via_ir = false
+# include metadata hash in bytecode
+#bytecode_hash = "none"
+# Whether to append the metadata hash to the bytecode
+#cbor_metadata = false
+# evm version (needed until all chains support PUSH0)
+#evm_version = "paris"
+# Contracts to track with --gas-report
+#gas_reports = []
+ignored_error_codes = [1878, 2519, 5574, 5667, 2462, 2072, 2018, 3420, 9302, 3628, 8417]
+solc="0.8.26"
+
+[fuzz]
+# Amount of runs per fuzz test
+runs = 256 # Do 5000-10000 right before deploy
+max_test_rejects = 25000
+seed = "0x34343" # Remove this later so you have more randomness
+
+[profile.src]
+test = "_" # Makes building faster
+script = "_"
+optimizer = true
+optimizer_runs = 200
+
+[profile.script]
+src = "_"
+test = "_"
+optimizer = true 
+optimizer_runs = 200
+
+[profile.deploy]
+src = "_"
+test = "_"
+optimizer = true
+optimizer_runs = 1_000_000
+via_ir = true
+
+[profile.test]
+src = "_"
+script = "_"
+optimizer = false
+build_info = false
+extra_output = []
+verbosity = 3
+ffi = true
+match_path = "./src/test/**/*.t.sol"
+
+[fmt]
+line_length = 1000 # This gets overriden by prettier afterwards
+tab_width = 4
+bracket_spacing = true
+int_types = "long"
+number_underscore = "thousands"
+
+[rpc_endpoints]
+frax_testnet = "https://rpc.testnet.frax.com"
+frax_mainnet = "https://rpc.frax.com"
+
+[etherscan]
+frax_testnet = { key = "frax_testnet", url = "https://explorer.testnet.frax.com/api?", chain = 2522 }
+frax_mainnet = { key = "${ETHERSCAN_API_KEY}", url = "https://api.fraxscan.com/api", chain = 252 }

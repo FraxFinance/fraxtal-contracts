@@ -1,0 +1,189 @@
+// SPDX-License-Identifier: ISC
+pragma solidity ^0.8.15;
+
+import { FraxTest } from "frax-std/FraxTest.sol";
+import { FraxchainPortal } from "src/contracts/Fraxtal/L1/FraxchainPortal.sol";
+import { OptimismPortal } from "@eth-optimism/contracts-bedrock/src/L1/OptimismPortal.sol";
+import { L2OutputOracle } from "@eth-optimism/contracts-bedrock/src/L1/L2OutputOracle.sol";
+import { L1CrossDomainMessenger } from "@eth-optimism/contracts-bedrock/src/L1/L1CrossDomainMessenger.sol";
+import { SystemConfig } from "@eth-optimism/contracts-bedrock/src/L1/SystemConfig.sol";
+import { DeployFraxchainPortal, deploySystemConfig, deployL2OutputOracle } from "src/script/Fraxtal/DeployFraxchainPortal.s.sol";
+import { deployProxyAndInitialize } from "src/script/Fraxtal/DeployProxyAndInitialize.s.sol";
+import { ResourceMetering } from "@eth-optimism/contracts-bedrock/src/L1/ResourceMetering.sol";
+import { Types } from "@eth-optimism/contracts-bedrock/src/libraries/Types.sol";
+import { FloxIncentivesDistributor } from "src/contracts/VestedFXS-and-Flox/Flox/FloxIncentivesDistributor.sol";
+import { console } from "frax-std/FraxTest.sol";
+import { SigUtils } from "./utils/SigUtils.sol";
+import "src/Constants.sol" as Constants;
+import { FFIInterface } from "@eth-optimism/contracts-bedrock/test/setup/FFIInterface.sol";
+import { SuperchainConfig } from "@eth-optimism/contracts-bedrock/src/L1/SuperchainConfig.sol";
+import { Proxy } from "@eth-optimism/contracts-bedrock/src/universal/Proxy.sol";
+import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+
+contract BaseTestFraxtal is FraxTest, Constants.Helper {
+    // Fraxtal-specific
+    // =========================================
+    IERC20 public frxETH = IERC20(0x5E8422345238F34275888049021821E8E08CAa1f);
+    SigUtils public sigUtils_frxETH;
+
+    FraxchainPortal public fraxchainPortal;
+    L2OutputOracle public oracle;
+    L1CrossDomainMessenger messenger;
+
+    FFIInterface public ffi;
+
+    uint256 public alicePrivateKey;
+    address payable public alice;
+    uint256 public bobPrivateKey;
+    address payable public bob;
+    uint256 public clairePrivateKey;
+    address payable public claire;
+    uint256 public davePrivateKey;
+    address payable public dave;
+    uint256 public ericPrivateKey;
+    address payable public eric;
+    uint256 public frankPrivateKey;
+    address payable public frank;
+
+    event WithdrawalProven(bytes32 indexed withdrawalHash, address indexed from, address indexed to);
+
+    function defaultSetup() internal virtual {
+        vm.createSelectFork(vm.envString("MAINNET_RPC_URL"), 18_121_304);
+
+        // Deploy the contracts
+        // ======================
+
+        // Deploy SuperchainConfig with proxy
+        SuperchainConfig superchainConfigImpl = new SuperchainConfig();
+        vm.startPrank(Constants.Mainnet.AMO_OWNER);
+        (, address proxy) = deployProxyAndInitialize({ _owner: Constants.Mainnet.AMO_OWNER, _implementation: address(superchainConfigImpl), _data: abi.encodeWithSelector(SuperchainConfig.initialize.selector, Constants.Mainnet.AMO_OWNER, false) });
+        vm.stopPrank();
+        SuperchainConfig _superchainConfig = SuperchainConfig(proxy);
+
+        // Create the SystemConfig and L2OutputOracle proxies first
+        SystemConfig _systemConfigImpl = deploySystemConfig();
+        vm.startPrank(Constants.Mainnet.AMO_OWNER);
+        (, proxy) = deployProxyAndInitialize({ _owner: Constants.Mainnet.AMO_OWNER, _implementation: address(_systemConfigImpl), _data: abi.encodeWithSelector(SystemConfig.initialize.selector, Constants.Mainnet.AMO_OWNER, 188, 684_000, 0x0000000000000000000000006887246668a3b87f54deb3b94ba47a6f63f32985, 30_000_000, Constants.Mainnet.AMO_OWNER, ResourceMetering.ResourceConfig(20_000_000, 10, 8, 1_000_000_000, 1_000_000, 340_282_366_920_938_463_463_374_607_431_768_211_455), address(0), SystemConfig.Addresses({ l1CrossDomainMessenger: address(0), l1ERC721Bridge: address(0), l1StandardBridge: address(0), l2OutputOracle: address(0), optimismPortal: address(0), optimismMintableERC20Factory: address(0) })) });
+        vm.stopPrank();
+
+        SystemConfig _systemConfig = SystemConfig(proxy);
+
+        L2OutputOracle _l2OracleImpl = deployL2OutputOracle();
+
+        vm.startPrank(Constants.Mainnet.AMO_OWNER);
+        (, proxy) = deployProxyAndInitialize({ _owner: Constants.Mainnet.AMO_OWNER, _implementation: address(_l2OracleImpl), _data: abi.encodeWithSelector(L2OutputOracle.initialize.selector, 1800, 2, 105_235_063, 1_686_068_903, Constants.Mainnet.AMO_OWNER, Constants.Mainnet.AMO_OWNER, 604_800) });
+        vm.stopPrank();
+
+        L2OutputOracle _l2Oracle = L2OutputOracle(proxy);
+
+        // Deploy FraxchainPortal with proxy
+        FraxchainPortal fraxchainPortalImpl = (new DeployFraxchainPortal()).run();
+        vm.startPrank(Constants.Mainnet.AMO_OWNER);
+        (, proxy) = deployProxyAndInitialize({ _owner: Constants.Mainnet.AMO_OWNER, _implementation: address(fraxchainPortalImpl), _data: abi.encodeWithSelector(FraxchainPortal.initialize.selector, address(_l2Oracle), address(_systemConfig), address(_superchainConfig)) });
+        vm.stopPrank();
+        fraxchainPortal = FraxchainPortal(payable(proxy));
+        // Cast fraxchain portal to optimism portal
+        OptimismPortal optimismPortal = OptimismPortal(payable(proxy));
+
+        // Deploy Messenger with proxy
+        L1CrossDomainMessenger messengerImpl = new L1CrossDomainMessenger();
+        vm.startPrank(Constants.Mainnet.AMO_OWNER);
+        (, proxy) = deployProxyAndInitialize({ _owner: Constants.Mainnet.AMO_OWNER, _implementation: address(messengerImpl), _data: abi.encodeWithSelector(L1CrossDomainMessenger.initialize.selector, address(_superchainConfig), address(optimismPortal), address(_systemConfig)) });
+        vm.stopPrank();
+        messenger = L1CrossDomainMessenger(proxy);
+
+        // hoax(address(0xdEaD));
+        hoax(Constants.Mainnet.AMO_OWNER);
+        _systemConfig.setGasConfig({ _overhead: 188, _scalar: 684_000 });
+        hoax(Constants.Mainnet.AMO_OWNER);
+        _systemConfig.setBatcherHash(0x0000000000000000000000006887246668a3b87f54deb3b94ba47a6f63f32985);
+        hoax(Constants.Mainnet.AMO_OWNER);
+        _systemConfig.setGasLimit(30_000_000);
+        hoax(Constants.Mainnet.AMO_OWNER);
+        _systemConfig.setUnsafeBlockSigner(Constants.Mainnet.TIMELOCK_ADDRESS);
+        hoax(Constants.Mainnet.AMO_OWNER);
+        _systemConfig.setResourceConfig(ResourceMetering.ResourceConfig(20_000_000, 10, 8, 1_000_000_000, 1_000_000, 340_282_366_920_938_463_463_374_607_431_768_211_455));
+
+        oracle = fraxchainPortal.l2Oracle();
+
+        // Set up Alice
+        alicePrivateKey = 0xA11CE;
+        alice = payable(vm.addr(alicePrivateKey));
+        vm.label(alice, "Alice");
+
+        // Set up Bob
+        bobPrivateKey = 0xB0B;
+        bob = payable(vm.addr(bobPrivateKey));
+        vm.label(bob, "Bob");
+
+        // Set up Claire
+        clairePrivateKey = 0xc0;
+        claire = payable(vm.addr(clairePrivateKey));
+        vm.label(claire, "Claire");
+
+        // Set up Dave
+        davePrivateKey = 0xDa;
+        dave = payable(vm.addr(davePrivateKey));
+        vm.label(dave, "Dave");
+
+        // Set up Eric
+        ericPrivateKey = 0xe0;
+        eric = payable(vm.addr(ericPrivateKey));
+        vm.label(eric, "Eric");
+
+        // Set up Frank
+        frankPrivateKey = 0xf0;
+        frank = payable(vm.addr(frankPrivateKey));
+        vm.label(frank, "Frank");
+
+        // Give the redeemer 100 frxETH
+        hoax(Constants.Mainnet.WALLET_WITH_FRXETH);
+        frxETH.transfer(alice, 100e18);
+
+        ffi = new FFIInterface();
+    }
+
+    // Pasted from contracts-bedrock/src/test/CommonTest.t.sol:FFIInterface:getProveWithdrawalTransactionInputs
+    function ffiGetProveWithdrawalTransactionInputs(Types.WithdrawalTransaction memory _tx) public returns (bytes32, bytes32, bytes32, bytes32, bytes[] memory) {
+        string[] memory cmds = new string[](8);
+        cmds[0] = "./scripts/go/bin/differential-testing";
+        cmds[1] = "getProveWithdrawalTransactionInputs";
+        cmds[2] = vm.toString(_tx.nonce);
+        cmds[3] = vm.toString(_tx.sender);
+        cmds[4] = vm.toString(_tx.target);
+        cmds[5] = vm.toString(_tx.value);
+        cmds[6] = vm.toString(_tx.gasLimit);
+        cmds[7] = vm.toString(_tx.data);
+
+        // Example
+        // go ./scripts/go/differential-testing.go 0 0xe05fcC23807536bEe418f142D19fa0d21BB0cfF7 0x0376AAc07Ad725E01357B1725B5ceC61aE10473c 100 100000 0x
+
+        bytes memory result = vm.ffi(cmds);
+        (bytes32 stateRoot, bytes32 storageRoot, bytes32 outputRoot, bytes32 withdrawalHash, bytes[] memory withdrawalProof) = abi.decode(result, (bytes32, bytes32, bytes32, bytes32, bytes[]));
+
+        return (stateRoot, storageRoot, outputRoot, withdrawalHash, withdrawalProof);
+    }
+
+    function proveWithdrawalTransaction(Types.WithdrawalTransaction memory _tx) public returns (bytes32 _withdrawalHash) {
+        // Get withdrawal proof data
+        bytes32 _stateRoot;
+        bytes32 _storageRoot;
+        bytes32 _outputRoot;
+        bytes[] memory _withdrawalProof;
+        (_stateRoot, _storageRoot, _outputRoot, _withdrawalHash, _withdrawalProof) = ffiGetProveWithdrawalTransactionInputs(_tx);
+
+        // Setup a dummy output root proof
+        Types.OutputRootProof memory _outputRootProof = Types.OutputRootProof({ version: bytes32(uint256(0)), stateRoot: _stateRoot, messagePasserStorageRoot: _storageRoot, latestBlockhash: bytes32(uint256(0)) });
+        uint256 _proposedBlockNumber = oracle.nextBlockNumber();
+        uint256 _proposedOutputIndex = oracle.nextOutputIndex();
+
+        // Set the state in the L2 Oracle
+        vm.startPrank(fraxchainPortal.l2Oracle().PROPOSER());
+        fraxchainPortal.L2_ORACLE().proposeL2Output(_outputRoot, _proposedBlockNumber, blockhash(block.number), _proposedBlockNumber);
+        vm.stopPrank();
+
+        vm.expectEmit(true, true, true, true);
+        emit WithdrawalProven(_withdrawalHash, _tx.sender, _tx.target);
+        fraxchainPortal.proveWithdrawalTransaction(_tx, _proposedOutputIndex, _outputRootProof, _withdrawalProof);
+    }
+}

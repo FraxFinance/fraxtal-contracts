@@ -1,0 +1,57 @@
+{
+  "userBalances": {
+    "0x071aafb1906897763f26c74a6660be4cd8b80051": {
+      "type": "BigNumber",
+      "hex": "0x025cedf7cffc72fc"
+    },
+    "0xa8c94ae38b04140794a9394b76ac6d0a83ac0b02": {
+      "type": "BigNumber",
+      "hex": "0x032ee0135e476a48"
+    },
+    "0xe7c147cd1a7c05a6e73217645547582024e87a9b": {
+      "type": "BigNumber",
+      "hex": "0x78020735b1b64e"
+    },
+    "0xba76c6980428a0b10cfc5d8ccb61949677a61233": {
+      "type": "BigNumber",
+      "hex": "0x027a2da2f0086ce0"
+    },
+    "0x947b7742c403f20e5faccdac5e092c943e7d0277": {
+      "type": "BigNumber",
+      "hex": "0x07b860fbff20b898"
+    },
+    "0xb0e1650a9760e0f383174af042091fc544b8356f": {
+      "type": "BigNumber",
+      "hex": "0x0753be25a2b944"
+    },
+    "0x8688515028955734350067695939423222009623": {
+      "type": "BigNumber",
+      "hex": "0x69738140629708"
+    },
+    "0x6edac7c2aaed7b0a455249aaf5be8b6b1597f8e1": {
+      "type": "BigNumber",
+      "hex": "0x220083b3ddc4d6"
+    },
+    "0xe6b328e141ef304739892a864cebfe148a04353e": {
+      "type": "BigNumber",
+      "hex": "0x31fb58183e3d4e"
+    },
+    "0x2d12d0907a388811e3aa855a550f959501d303ee": {
+      "type": "BigNumber",
+      "hex": "0x012eb55a042b0334"
+    },
+    "0x31562ae726afebe25417df01bedc72ef489f45b3": {
+      "type": "BigNumber",
+      "hex": "0xb1a2bc2ec50000"
+    },
+    "0x6e74053a3798e0fc9a9775f7995316b27f21c4d2": {
+      "type": "BigNumber",
+      "hex": "0x00"
+    },
+    "0xbaeb92889696217a3a6be2175e5a95dc4cffc9f7": {
+      "type": "BigNumber",
+      "hex": "0x00"
+    }
+  },
+  "blockNumber": 540545
+}

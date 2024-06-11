@@ -1,0 +1,138 @@
+// SPDX-License-Identifier: ISC
+pragma solidity ^0.8.15;
+
+import { BaseTestFraxtal } from "../BaseTestFraxtal.t.sol";
+import { FraxchainPortal } from "src/contracts/Fraxtal/L1/FraxchainPortal.sol";
+import { AddressAliasHelper } from "@eth-optimism/contracts-bedrock/src/vendor/AddressAliasHelper.sol";
+import { Types } from "@eth-optimism/contracts-bedrock/src/libraries/Types.sol";
+import { FraxTest } from "frax-std/FraxTest.sol";
+import { console } from "frax-std/FraxTest.sol";
+import { SigUtils } from "src/test/Fraxtal/utils/SigUtils.sol";
+import "src/Constants.sol" as Constants;
+import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+
+contract Unit_Test_FraxchainPortal is BaseTestFraxtal {
+    function test_send_ETH() public {
+        defaultSetup();
+
+        bytes memory opaqueData = abi.encodePacked(uint256(1e18), uint256(1e18), uint64(100_000), false, bytes(""));
+        vm.expectEmit(true, true, true, true, address(fraxchainPortal));
+        // From is aliassed, because Alice is not considered and EOA
+        emit TransactionDeposited(AddressAliasHelper.applyL1ToL2Alias(alice), alice, 0, opaqueData);
+
+        hoax(alice);
+        address(fraxchainPortal).call{ value: 1e18 }("");
+        //console.log("balance:", address(fraxchainPortal).balance);
+    }
+
+    function test_bridgeFrxETH() public {
+        defaultSetup();
+
+        // Alice bridges frxETH
+        hoax(alice);
+        frxETH.approve(address(fraxchainPortal), 1e18);
+
+        // The FraxchainPortal should transfer alice's tokens to itself
+        vm.expectCall(address(frxETH), abi.encodeWithSelector(IERC20.transferFrom.selector, alice, address(fraxchainPortal), 1e18));
+
+        bytes memory opaqueData = abi.encodePacked(uint256(1e18), uint256(1e18), uint64(100_000), false, bytes(""));
+        vm.expectEmit(true, true, true, true, address(fraxchainPortal));
+        // From is aliassed, because Alice is not considered and EOA
+        emit TransactionDeposited(AddressAliasHelper.applyL1ToL2Alias(alice), alice, 0, opaqueData);
+
+        vm.prank(alice);
+        fraxchainPortal.bridgeFrxETH(1e18);
+    }
+
+    function test_mintFrxETH() public {
+        defaultSetup();
+        hoax(alice);
+        // Send ETH to the portal
+        address(fraxchainPortal).call{ value: 1e18 }("");
+
+        uint256 minterBalance_before = fraxchainPortal.FRXETH_MINTER().balance;
+        uint256 portalBalance_before = address(fraxchainPortal).balance;
+        fraxchainPortal.mintFrxETH();
+        uint256 minterBalance_after = fraxchainPortal.FRXETH_MINTER().balance;
+        uint256 portalBalance_after = address(fraxchainPortal).balance;
+        vm.assume(minterBalance_after - minterBalance_before == 1e18);
+        vm.assume(portalBalance_before - portalBalance_after == 1e18);
+        vm.assume(frxETH.balanceOf(address(fraxchainPortal)) == 1e18);
+    }
+
+    function test_proveWithdrawalTransaction() public {
+        defaultSetup();
+
+        Types.WithdrawalTransaction memory _tx = Types.WithdrawalTransaction({ nonce: 0, sender: alice, target: bob, value: 100, gasLimit: 100_000, data: hex"" });
+        proveWithdrawalTransaction(_tx);
+    }
+
+    function test_finalizeWithdrawalTransaction() public {
+        defaultSetup();
+        address(fraxchainPortal).call{ value: 1e18 }("");
+        uint256 bobBalanceBefore = address(bob).balance;
+
+        Types.WithdrawalTransaction memory _tx = Types.WithdrawalTransaction({ nonce: 0, sender: alice, target: bob, value: 100, gasLimit: 100_000, data: hex"" });
+        bytes32 _withdrawalHash = proveWithdrawalTransaction(_tx);
+
+        vm.warp(block.timestamp + oracle.FINALIZATION_PERIOD_SECONDS() + 1);
+        vm.expectEmit(true, true, false, true);
+        emit WithdrawalFinalized(_withdrawalHash, true);
+        fraxchainPortal.finalizeWithdrawalTransaction(_tx);
+
+        assert(address(bob).balance == bobBalanceBefore + 100);
+    }
+
+    function test_finalizeWithdrawalTransaction_payable() public {
+        defaultSetup();
+
+        hoax(alice);
+        frxETH.approve(address(fraxchainPortal), 1e18);
+        vm.prank(alice);
+        fraxchainPortal.bridgeFrxETH(1e18);
+
+        uint256 bobBalanceBefore = address(bob).balance;
+
+        Types.WithdrawalTransaction memory _tx = Types.WithdrawalTransaction({ nonce: 0, sender: alice, target: bob, value: 100, gasLimit: 100_000, data: hex"" });
+        bytes32 _withdrawalHash = proveWithdrawalTransaction(_tx);
+
+        vm.warp(block.timestamp + oracle.FINALIZATION_PERIOD_SECONDS() + 1);
+        vm.expectEmit(true, true, false, true);
+        emit WithdrawalFinalized(_withdrawalHash, true);
+        fraxchainPortal.finalizeWithdrawalTransaction{ value: 100 }(_tx);
+
+        assert(address(bob).balance == bobBalanceBefore + 100);
+    }
+
+    function test_finalizeWithdrawalTransaction_frxETH() public {
+        defaultSetup();
+
+        hoax(alice);
+        frxETH.approve(address(fraxchainPortal), 1e18);
+        vm.prank(alice);
+        fraxchainPortal.bridgeFrxETH(1e18);
+
+        uint256 bobBalanceBefore = frxETH.balanceOf(bob);
+
+        Types.WithdrawalTransaction memory _tx = Types.WithdrawalTransaction({
+            nonce: 0,
+            sender: alice,
+            target: address(bob),
+            value: 100,
+            gasLimit: 0,
+            data: abi.encodePacked(bytes1(0xfe)) // Signal that we want to withdraw frxETH
+         });
+        bytes32 _withdrawalHash = proveWithdrawalTransaction(_tx);
+
+        vm.warp(block.timestamp + oracle.FINALIZATION_PERIOD_SECONDS() + 1);
+        vm.expectEmit(true, true, false, true);
+        emit WithdrawalFinalized(_withdrawalHash, true);
+        fraxchainPortal.finalizeWithdrawalTransaction(_tx);
+
+        assert(frxETH.balanceOf(bob) == bobBalanceBefore + 100);
+    }
+
+    event TransactionDeposited(address indexed from, address indexed to, uint256 indexed version, bytes opaqueData);
+
+    event WithdrawalFinalized(bytes32 indexed withdrawalHash, bool success);
+}

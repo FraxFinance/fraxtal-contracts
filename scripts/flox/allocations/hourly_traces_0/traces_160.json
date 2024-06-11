@@ -1,0 +1,24 @@
+{
+  "users": {
+    "0xc6ef452b0de9e95ccb153c2a5a7a90154aab3419": {
+      "totalGas": 520160,
+      "totalFee": 2122154965264640,
+      "transactions": 1,
+      "contracts": {
+        "0x219356ef2f11a314dd0d8bfd7f4b0b951cb16c3a": {
+          "totalGas": 520160,
+          "totalFee": 2122154965264640,
+          "calls": 1
+        }
+      }
+    }
+  },
+  "contracts": {
+    "0x219356ef2f11a314dd0d8bfd7f4b0b951cb16c3a": {
+      "totalGas": 520160,
+      "totalFee": 2122154965264640,
+      "calls": 1
+    }
+  },
+  "blockLastBlock": 289790
+}

@@ -1,0 +1,12 @@
+# directories
+out
+broadcast
+cache
+artifacts
+src/test
+src/test/**/*.sol
+
+# files
+*.env
+
+
