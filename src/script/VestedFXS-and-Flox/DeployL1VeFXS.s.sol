@@ -14,7 +14,7 @@ function deployL1VeFXS(
     address _proxyAdminOwner,
     address _implementationOwner
 ) returns (address) {
-    bytes32 salt = bytes32("L1VeFXS");
+    bytes32 salt = bytes32("L1VeFXS1");
 
     // deploy implementation
     address implementation = address(new L1VeFXS{ salt: salt }());
@@ -22,6 +22,15 @@ function deployL1VeFXS(
     // deploy proxy && Atomically initialize the implementation
     bytes memory data = abi.encodeCall(L1VeFXS.initialize, (_stateRootOracle, _implementationOwner));
     FraxtalProxy proxy = new FraxtalProxy{ salt: salt }(implementation, _proxyAdminOwner, data);
+
+    console.log("==================== FraxtalProxy Info ====================");
+    console.log("<<<<< implementation >>>>>");
+    console.log(implementation);
+    console.log("<<<<< _proxyAdminOwner >>>>>");
+    console.log(_proxyAdminOwner);
+    console.log("<<<<< data >>>>>");
+    console.logBytes(data);
+
     return payable(address(proxy));
 }
 
@@ -35,7 +44,7 @@ contract DeployL1VeFXS is BaseScript {
         // Initialize tempAdmin and eventualAdmin
         tempAdmin = msg.sender;
 
-        if (false) {
+        if (vm.envBool("IS_PROD")) {
             // Prod deploy
             eventualAdmin = 0xC4EB45d80DC1F079045E75D5d55de8eD1c1090E6;
         } else {

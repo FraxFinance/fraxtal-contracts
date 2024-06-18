@@ -34,6 +34,8 @@ contract DeploySfraxMintRedeemer is BaseScript {
     address sfraxOracle;
     address tempAdmin;
     address eventualAdmin;
+    uint256 fee;
+    uint256 initialVaultTknPrice;
 
     function run()
         public
@@ -47,19 +49,26 @@ contract DeploySfraxMintRedeemer is BaseScript {
         // Initialize tempAdmin and eventualAdmin
         tempAdmin = msg.sender;
 
-        if (false) {
+        if (vm.envBool("IS_PROD")) {
             // Prod deploy
             frax = Constants.FraxtalStandardProxies.FRAX_PROXY;
             sfrax = Constants.FraxtalStandardProxies.SFRAX_PROXY;
             fraxOracle = address(0);
-            sfraxOracle = 0xF750636E1df115e3B334eD06E5b45c375107FC60;
+            sfraxOracle = 0x1B680F4385f24420D264D78cab7C58365ED3F1FF;
             eventualAdmin = 0xC4EB45d80DC1F079045E75D5d55de8eD1c1090E6;
+            fee = 0.0000001e18;
+            initialVaultTknPrice = 1.0571e18;
         } else {
             // Test deploy
             eventualAdmin = address(0);
             fraxOracle = address(deployManualPriceOracle(tempAdmin, frax, 1e6));
             sfraxOracle = address(deployManualPriceOracle(tempAdmin, sfrax, 1.04e6));
+            fee = 0.0000001e18;
+            initialVaultTknPrice = 1.04e18;
         }
+
+        // Print the timestamp
+        console.log("<<< Timestamp: %s >>>", block.timestamp);
 
         // Set return variables
         _fraxOracle = ManualPriceOracle(fraxOracle);
@@ -70,12 +79,12 @@ contract DeploySfraxMintRedeemer is BaseScript {
 
         // Deploy FraxtalERC4626MintRedeemer implementation and its' proxy
         FraxtalERC4626MintRedeemer implementation = new FraxtalERC4626MintRedeemer();
-        Proxy proxy = new Proxy{ salt: bytes32("sFRAX123") }(tempAdmin);
+        Proxy proxy = new Proxy{ salt: bytes32("sFRAX1234") }(tempAdmin);
 
         // Upgrade proxy to implementation and call initialize
         bytes memory data = abi.encodeCall(
             implementation.initialize,
-            (eventualAdmin, frax, sfrax, fraxOracle, sfraxOracle, 1e11)
+            (eventualAdmin, frax, sfrax, fraxOracle, sfraxOracle, fee, initialVaultTknPrice)
         );
         proxy.upgradeToAndCall({ _implementation: address(implementation), _data: data });
 

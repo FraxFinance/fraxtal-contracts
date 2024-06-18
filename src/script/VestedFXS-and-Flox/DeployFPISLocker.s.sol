@@ -44,7 +44,7 @@ contract DeployFPISLocker is BaseScript {
         // Initialize tempAdmin and eventualAdmin
         tempAdmin = msg.sender;
 
-        if (false) {
+        if (vm.envBool("IS_PROD")) {
             // Prod deploy
             token = Constants.FraxtalStandardProxies.FPIS_PROXY;
             fxs = Constants.FraxtalStandardProxies.FXS_PROXY;
@@ -72,7 +72,7 @@ contract DeployFPISLocker is BaseScript {
 
         // Deploy FPISLocker implementation and its' proxy
         FPISLocker implementation = deployFPISLocker();
-        Proxy proxy = new Proxy{ salt: bytes32("lFPISABCDEFGHIJ") }(tempAdmin);
+        Proxy proxy = new Proxy{ salt: bytes32("lFPISABCDEFGHIJK") }(tempAdmin);
 
         // Upgrade proxy to implementation and call initialize
         bytes memory data = abi.encodeCall(

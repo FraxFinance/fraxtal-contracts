@@ -10,6 +10,8 @@ import "forge-std/console2.sol";
 import { Math } from "@openzeppelin/contracts/utils/math/Math.sol";
 
 contract Unit_Test_sFRAXRedeemer is BaseTestMisc {
+    uint256 fee;
+
     function sFraxRedeemerSetup() public {
         console.log("sFraxRedeemerSetup() called");
         super.defaultSetup();
@@ -24,6 +26,9 @@ contract Unit_Test_sFRAXRedeemer is BaseTestMisc {
 
         // Update the vault token price oracle
         sfraxMintRedeemer.updateVaultTknOracle();
+
+        // Note the fee
+        fee = sfraxMintRedeemer.fee();
     }
 
     function test_transferOwnership() public {
@@ -85,10 +90,11 @@ contract Unit_Test_sFRAXRedeemer is BaseTestMisc {
         // Fetch the view info again
         (_maxAssetsDepositable, _maxSharesMintable, _maxAssetsWithdrawable, _maxSharesRedeemable) = sfraxMintRedeemer.mdwrComboView();
 
-        // Everything should be 0 right now
-        assertEq(_maxAssetsDepositable, 1040e18, "[MDWR]: Final _maxAssetsDepositable");
+        // Check
+        assertEq(_maxAssetsDepositable, 1040e18 + Math.mulDiv(fee, 1040e18, 1e18, Math.Rounding.Up), "[MDWR]: Final _maxAssetsDepositable");
         assertEq(_maxSharesMintable, 1000e18, "[MDWR]: Final _maxSharesMintable");
         assertEq(_maxAssetsWithdrawable, 1000e18, "[MDWR]: Final _maxAssetsWithdrawable");
+        // 1000 / 1.04 = ~961.538
         assertApproxEqRel(_maxSharesRedeemable, 961.538e18, 0.01e18, "[MDWR]: Final _maxSharesRedeemable");
     }
 

@@ -62,7 +62,7 @@ contract FraxtalERC4626MintRedeemer is OwnedV2AutoMsgSender, ReentrancyGuard {
     /// @notice Last time the vault token oracle was read
     uint256 public lastVaultTknOracleRead;
 
-    /// @notice Micro Fee for deposit|mint/withdraw|redeem flow
+    /// @notice Micro Fee for deposit|mint/withdraw|redeem flow. 18 decimals
     uint256 public fee;
 
     // CONSTRUCTOR & INITIALIZER
@@ -82,6 +82,7 @@ contract FraxtalERC4626MintRedeemer is OwnedV2AutoMsgSender, ReentrancyGuard {
      * @param _underlyingOracle Price oracle for the underlying token
      * @param _vaultOracle Price oracle for the vault token
      * @param _fee The fee to implement on mint|deposit/redeem|withdraw flow
+     * @param _initialVaultTknPrice Initial price of the vault token
      */
     function initialize(
         address _owner,
@@ -89,7 +90,8 @@ contract FraxtalERC4626MintRedeemer is OwnedV2AutoMsgSender, ReentrancyGuard {
         address _vaultTkn,
         address _underlyingOracle,
         address _vaultOracle,
-        uint256 _fee
+        uint256 _fee,
+        uint256 _initialVaultTknPrice
     ) public {
         // Safety checks - no validation on admin in case this is initialized without admin
         if (wasInitialized || (address(underlyingTkn) != address(0))) {
@@ -107,14 +109,14 @@ contract FraxtalERC4626MintRedeemer is OwnedV2AutoMsgSender, ReentrancyGuard {
         priceFeedUnderlying = AggregatorV3Interface(_underlyingOracle);
         priceFeedVault = AggregatorV3Interface(_vaultOracle);
 
-        // Set initial prices
-        vaultTknPrice = uint256(getLatestVaultTknPriceE18());
+        // Set initial vault token price
+        vaultTknPrice = _initialVaultTknPrice;
 
-        // Set the mint|deposit/redeem|withdraw flow  flow fee
+        // Set the mint|deposit/redeem|withdraw flow fee
         fee = _fee;
 
         // Set initial oracle time tolerance
-        oracleTimeTolerance = 21_600; // Default to 6 hours
+        oracleTimeTolerance = 28_800; // Default to 8 hours
 
         // Set the contract as initialized
         wasInitialized = true;
@@ -215,7 +217,7 @@ contract FraxtalERC4626MintRedeemer is OwnedV2AutoMsgSender, ReentrancyGuard {
         _assets = _convertToAssets(_shares, Math.Rounding.Down);
     }
 
-    /// @notice Returns the maximum amount of the underlying asset that can be deposited into the contract for the receiver, through a deposit call.
+    /// @notice Returns the maximum amount of the underlying asset that can be deposited into the contract for the receiver, through a deposit call. Includes fee.
     /// @param _addr The address to test
     /// @return _maxAssetsIn The max amount that can be deposited
     /**
@@ -224,10 +226,10 @@ contract FraxtalERC4626MintRedeemer is OwnedV2AutoMsgSender, ReentrancyGuard {
      */
     function maxDeposit(address _addr) public view returns (uint256 _maxAssetsIn) {
         // See how much underlyingTkn you would need to exchange for 100% of the vaultTkn in the contract
-        _maxAssetsIn = _convertToAssets(vaultTkn.balanceOf(address(this)), Math.Rounding.Down);
+        _maxAssetsIn = previewMint(vaultTkn.balanceOf(address(this)));
     }
 
-    /// @notice Returns the maximum amount of shares that can be minted for the receiver, through a mint call.
+    /// @notice Returns the maximum amount of shares that can be minted for the receiver, through a mint call. Includes fee.
     /// @param _addr The address to test
     /// @return _maxSharesOut The max amount that can be minted
     /**
@@ -239,7 +241,7 @@ contract FraxtalERC4626MintRedeemer is OwnedV2AutoMsgSender, ReentrancyGuard {
         _maxSharesOut = vaultTkn.balanceOf(address(this));
     }
 
-    /// @notice Returns the maximum amount of the underlying asset that can be withdrawn from the owner balance in the contract, through a withdraw call.
+    /// @notice Returns the maximum amount of the underlying asset that can be withdrawn from the owner balance in the contract, through a withdraw call. Includes fee.
     /// @param _owner The address to check
     /// @return _maxAssetsOut The maximum amount of underlying asset that can be withdrawn
     /**
@@ -250,7 +252,7 @@ contract FraxtalERC4626MintRedeemer is OwnedV2AutoMsgSender, ReentrancyGuard {
      */
     function maxWithdraw(address _owner) public view returns (uint256 _maxAssetsOut) {
         // See how much underlyingTkn the user could possibly withdraw with 100% of his vaultTkn
-        uint256 _maxAssetsUser = _convertToAssets(vaultTkn.balanceOf(address(_owner)), Math.Rounding.Down);
+        uint256 _maxAssetsUser = previewRedeem(vaultTkn.balanceOf(address(_owner)));
 
         // See how much underlyingTkn is actually available in the contract
         uint256 _assetBalanceContract = underlyingTkn.balanceOf(address(this));
@@ -259,7 +261,7 @@ contract FraxtalERC4626MintRedeemer is OwnedV2AutoMsgSender, ReentrancyGuard {
         _maxAssetsOut = ((_assetBalanceContract > _maxAssetsUser) ? _maxAssetsUser : _assetBalanceContract);
     }
 
-    /// @notice Returns the maximum amount of shares that can be redeemed from the owner balance in the contract, through a redeem call.
+    /// @notice Returns the maximum amount of shares that can be redeemed from the owner balance in the contract, through a redeem call. Includes fee.
     /// @param _owner The address to check
     /// @return _maxSharesIn The maximum amount of shares that can be redeemed
     /**
@@ -270,7 +272,7 @@ contract FraxtalERC4626MintRedeemer is OwnedV2AutoMsgSender, ReentrancyGuard {
      */
     function maxRedeem(address _owner) public view returns (uint256 _maxSharesIn) {
         // See how much vaultTkn the contract could honor if 100% of its underlyingTkn was redeemed
-        uint256 _maxSharesContract = _convertToShares(underlyingTkn.balanceOf(address(this)), Math.Rounding.Down);
+        uint256 _maxSharesContract = previewWithdraw(underlyingTkn.balanceOf(address(this)));
 
         // See how much vaultTkn the user has
         uint256 _sharesBalanceUser = vaultTkn.balanceOf(address(_owner));
@@ -369,10 +371,10 @@ contract FraxtalERC4626MintRedeemer is OwnedV2AutoMsgSender, ReentrancyGuard {
         )
     {
         return (
-            _convertToAssets(vaultTkn.balanceOf(address(this)), Math.Rounding.Down),
+            previewMint(vaultTkn.balanceOf(address(this))),
             vaultTkn.balanceOf(address(this)),
             underlyingTkn.balanceOf(address(this)),
-            _convertToShares(underlyingTkn.balanceOf(address(this)), Math.Rounding.Down)
+            previewWithdraw(underlyingTkn.balanceOf(address(this)))
         );
     }
 

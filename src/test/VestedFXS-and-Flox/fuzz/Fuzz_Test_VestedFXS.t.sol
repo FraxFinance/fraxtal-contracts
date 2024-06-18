@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity >=0.8.0;
 
+import { console } from "frax-std/FraxTest.sol";
 import { BaseTestVeFXS } from "../BaseTestVeFXS.t.sol";
 import { MintableBurnableTestERC20 } from "src/test/VestedFXS-and-Flox/helpers/MintableBurnableTestERC20.sol";
 import { VestedFXS } from "src/contracts/VestedFXS-and-Flox/VestedFXS/VestedFXS.sol";
@@ -247,23 +248,36 @@ contract Fuzz_Test_VestedFXS is BaseTestVeFXS {
         assertEq(finalContractBalance, initialContractBalance - amount);
     }
 
-    function testFuzz_RandomOperation(address user, address floxContributor, uint256 amount, uint128 unlockTimestamp, uint128 increaseTime, uint256 increaseValue, bool useFloxContributor, bool useIncreaseTime, bool useIncreaseValue, bool withdraw) public {
+    function testFuzz_RandomOperation(address user, address floxContributor, uint256 amount, uint128 unlockTsU128, uint128 increaseTime, uint256 increaseValue, bool useFloxContributor, bool useIncreaseUnlockTime, bool useIncreaseValue, bool withdraw) public {
         vm.assume(user != address(0));
         vm.assume(floxContributor != address(0));
         amount = bound(amount, 1000 gwei, 10_000_000e18);
         uint128 lowerBound = uint128(block.timestamp) + (uint128(WEEK) * 6);
         uint128 upperBound = uint128(block.timestamp) + uint128(MAXTIME) - (uint128(WEEK) * 4);
-        unlockTimestamp = uint128(bound(unlockTimestamp, lowerBound, upperBound));
-        increaseTime = (uint128(bound(increaseTime, uint128(WEEK), upperBound - unlockTimestamp + (uint128(WEEK) * 2))) / uint128(WEEK)) * uint128(WEEK);
+        unlockTsU128 = uint128(bound(unlockTsU128, lowerBound, upperBound));
+        increaseTime = (uint128(bound(increaseTime, uint128(WEEK), upperBound - unlockTsU128 + (uint128(WEEK) * 2))) / uint128(WEEK)) * uint128(WEEK);
         increaseValue = bound(increaseValue, 1000 gwei, 10_000_000e18);
+        uint256 unlockTsTruncU256 = (uint256(unlockTsU128) / uint256(uint128(WEEK))) * uint256(uint128(WEEK));
 
-        uint256 unlockTimestamp_ = (uint256(unlockTimestamp) / uint256(uint128(WEEK))) * uint256(uint128(WEEK));
+        console.log("---------------------- BOUND VARIABLES ----------------------");
+        console.log("amount: %s", amount);
+        console.log("unlockTsU128: %s", unlockTsU128);
+        console.log("increaseTime: %s", increaseTime);
+        console.log("increaseValue: %s", increaseValue);
+        console.log("unlockTsTruncU256: %s", unlockTsTruncU256);
+        console.log("useFloxContributor: %s", useFloxContributor);
+        console.log("useIncreaseUnlockTime: %s", useIncreaseUnlockTime);
+        console.log("useIncreaseValue: %s", useIncreaseValue);
+        console.log("withdraw: %s", withdraw);
 
+        console.log("---------------------- mint ----------------------");
         if (useFloxContributor) {
+            console.log("   -- Using floxContributor");
             token.mint(floxContributor, amount);
             hoax(floxContributor);
             token.approve(address(vestedFXS), amount);
         } else {
+            console.log("   -- Using user");
             token.mint(user, amount);
             hoax(user);
             token.approve(address(vestedFXS), amount);
@@ -271,32 +285,42 @@ contract Fuzz_Test_VestedFXS is BaseTestVeFXS {
 
         uint256 initialBalance = token.balanceOf(address(vestedFXS));
 
+        console.log("---------------------- createLock ----------------------");
         if (useFloxContributor) {
+            console.log("   -- Using floxContributor");
             vestedFXS.setFloxContributor(floxContributor, true);
             hoax(floxContributor);
         } else {
+            console.log("   -- Using user");
             hoax(user);
         }
         vm.expectEmit(true, true, true, true, address(vestedFXS));
-        emit Deposit(user, useFloxContributor ? floxContributor : user, unlockTimestamp_, amount, CREATE_LOCK_TYPE, block.timestamp);
+        emit Deposit(user, useFloxContributor ? floxContributor : user, unlockTsTruncU256, amount, CREATE_LOCK_TYPE, block.timestamp);
         vm.expectEmit(false, false, false, true, address(vestedFXS));
         emit Supply(initialBalance, initialBalance + amount);
-        vestedFXS.createLock(user, amount, unlockTimestamp);
+        vestedFXS.createLock(user, amount, unlockTsU128);
 
-        if (useIncreaseTime) {
+        if (useIncreaseUnlockTime) {
+            console.log("---------------------- increaseUnlockTime ----------------------");
+            console.log("   -- checkpoint");
             vm.roll(block.number + 10);
             skip(uint128(WEEK) * 2);
             vestedFXS.checkpoint();
 
+            console.log("   -- increaseUnlockTime");
             vm.expectEmit(true, true, true, true, address(vestedFXS));
-            emit Deposit(user, user, unlockTimestamp_ + increaseTime, 0, INCREASE_UNLOCK_TIME, uint256(block.timestamp));
+            emit Deposit(user, user, unlockTsTruncU256 + increaseTime, 0, INCREASE_UNLOCK_TIME, uint256(block.timestamp));
             vm.expectEmit(false, false, false, true, address(vestedFXS));
             emit Supply(initialBalance + amount, initialBalance + amount);
             hoax(user);
-            vestedFXS.increaseUnlockTime(unlockTimestamp + increaseTime, 0);
+            vestedFXS.increaseUnlockTime(unlockTsU128 + increaseTime, 0);
+        } else {
+            console.log("---------------------- SKIPPING increaseUnlockTime ----------------------");
         }
 
+        console.log("---------------------- useIncreaseValue ----------------------");
         if (useIncreaseValue) {
+            console.log("   -- checkpoint");
             vm.roll(block.number + 10);
             skip(uint128(WEEK) * 2);
             vestedFXS.checkpoint();
@@ -306,12 +330,14 @@ contract Fuzz_Test_VestedFXS is BaseTestVeFXS {
 
             hoax(user);
             token.approve(address(vestedFXS), increaseValue);
-            if (useIncreaseTime) {
+            if (useIncreaseUnlockTime) {
+                console.log("   -- expectEmit WITH useIncreaseUnlockTime precondition");
                 vm.expectEmit(true, true, true, true, address(vestedFXS));
-                emit Deposit(user, user, unlockTimestamp_ + increaseTime, increaseValue, INCREASE_LOCK_AMOUNT, block.timestamp);
+                emit Deposit(user, user, unlockTsTruncU256 + increaseTime, increaseValue, INCREASE_LOCK_AMOUNT, block.timestamp);
             } else {
+                console.log("   -- expectEmit WITHOUT useIncreaseUnlockTime precondition");
                 vm.expectEmit(true, true, true, true, address(vestedFXS));
-                emit Deposit(user, user, unlockTimestamp_, increaseValue, INCREASE_LOCK_AMOUNT, block.timestamp);
+                emit Deposit(user, user, unlockTsTruncU256, increaseValue, INCREASE_LOCK_AMOUNT, block.timestamp);
             }
             vm.expectEmit(false, false, false, true, address(vestedFXS));
             emit Supply(initialBalance, initialBalance + increaseValue);
@@ -319,7 +345,9 @@ contract Fuzz_Test_VestedFXS is BaseTestVeFXS {
             vestedFXS.increaseAmount(increaseValue, 0);
         }
 
+        console.log("---------------------- withdraw ----------------------");
         if (withdraw) {
+            console.log("   -- checkpoint");
             vm.roll(block.number + 10);
             skip(uint128(MAXTIME) + 1);
             vestedFXS.checkpoint();
@@ -327,17 +355,21 @@ contract Fuzz_Test_VestedFXS is BaseTestVeFXS {
             initialBalance = token.balanceOf(address(vestedFXS));
 
             if (useIncreaseValue) {
+                console.log("   -- expectEmit [Withdraw] WITH useIncreaseUnlockTime precondition");
                 vm.expectEmit(true, false, false, true, address(vestedFXS));
                 emit Withdraw(user, user, amount + increaseValue, block.timestamp);
             } else {
+                console.log("   -- expectEmit [Withdraw] WITHOUT useIncreaseUnlockTime precondition");
                 vm.expectEmit(true, false, false, true, address(vestedFXS));
                 emit Withdraw(user, user, amount, block.timestamp);
             }
 
             if (useIncreaseValue) {
+                console.log("   -- expectEmit [Supply] WITH useIncreaseUnlockTime precondition");
                 vm.expectEmit(false, false, false, true, address(vestedFXS));
                 emit Supply(initialBalance, initialBalance - (amount + increaseValue));
             } else {
+                console.log("   -- expectEmit [Supply] WITHOUT useIncreaseUnlockTime precondition");
                 vm.expectEmit(false, false, false, true, address(vestedFXS));
                 emit Supply(initialBalance, initialBalance - amount);
             }

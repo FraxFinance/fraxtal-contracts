@@ -24,13 +24,11 @@ contract DeployYieldDistributor is BaseScript {
     address eventualAdmin;
     address veFXSAggregatorAddress;
 
-    bool IS_PROD = false;
-
     function run() public broadcaster returns (YieldDistributor _veFXSYieldDistributor) {
         // Initialize tempProxyAdmin and eventualAdmin
         tempProxyAdmin = msg.sender;
 
-        if (IS_PROD) {
+        if (vm.envBool("IS_PROD")) {
             // Prod deploy
             token = Constants.FraxtalStandardProxies.FXS_PROXY;
             veFXSAggregatorAddress = Constants.FraxtalMainnet.VEFXS_AGGREGATOR_PROXY;
@@ -72,7 +70,7 @@ contract DeployYieldDistributor is BaseScript {
         proxy.changeAdmin({ _admin: eventualAdmin });
 
         // Set the YieldDistributor interface to the proxy (note: not needed - for testing clarity)
-        if (!IS_PROD) _veFXSYieldDistributor = YieldDistributor(address(proxy));
+        if (!vm.envBool("IS_PROD")) _veFXSYieldDistributor = YieldDistributor(address(proxy));
 
         console.log("======== ADDRESSES ======== ");
         console.log("Proxy: ", address(proxy));
@@ -81,7 +79,6 @@ contract DeployYieldDistributor is BaseScript {
 
     function runTest(address _token, address _veFXSAggregatorAddress) external returns (YieldDistributor) {
         token = _token;
-        IS_PROD = false;
         veFXSAggregatorAddress = _veFXSAggregatorAddress;
         return run();
     }

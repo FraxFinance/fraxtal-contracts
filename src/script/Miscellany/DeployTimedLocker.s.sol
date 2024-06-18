@@ -13,6 +13,7 @@ contract DeployTimedLocker is BaseScript {
     address rewardToken;
     address tempAdmin;
     address eventualAdmin;
+    address extraNotifier;
 
     // Temporary names
     string tmpName;
@@ -20,22 +21,20 @@ contract DeployTimedLocker is BaseScript {
     uint256 tmpEndTs;
     uint256 tmpCap;
 
-    bool IS_PROD = true;
-
     function run() public broadcaster returns (TimedLocker _timedLocker) {
         // Initialize tempProxyAdmin and eventualAdmin
         tempAdmin = msg.sender;
 
-        if (IS_PROD) {
+        if (vm.envBool("IS_PROD")) {
             // Prod deploy
-            revert("Fix me");
-            // stakingToken = XXXXXXX;
-            // rewardToken = Constants.FraxtalStandardProxies.FXS_PROXY;
-            // string tmpName = "Locked FXB 20251231";
-            // string tmpSymbol = "lFXB_20251231";
-            // uint256 tmpEndTs = 1767254400;
-            // uint256 tmpCap = 2_500_000e18;
-            // eventualAdmin = 0xC4EB45d80DC1F079045E75D5d55de8eD1c1090E6;
+            stakingToken = Constants.FraxtalMainnet.FXB_20261231;
+            rewardToken = Constants.FraxtalStandardProxies.FXS_PROXY;
+            tmpName = "Locked FXB 20261231";
+            tmpSymbol = "lFXB_20261231";
+            tmpEndTs = 1_798_761_600;
+            tmpCap = 2_500_000e18;
+            eventualAdmin = 0xC4EB45d80DC1F079045E75D5d55de8eD1c1090E6;
+            extraNotifier = 0x5180db0237291A6449DdA9ed33aD90a38787621c;
         } else {
             // Test deploy
             tmpName = "Locked FXB 20251231";
@@ -43,6 +42,7 @@ contract DeployTimedLocker is BaseScript {
             tmpEndTs = 1_767_254_400;
             tmpCap = 2_500_000e18;
             eventualAdmin = msg.sender;
+            extraNotifier = 0x0000000000000000000000000000000000000000;
         }
 
         // Setup the reward token array
@@ -57,7 +57,8 @@ contract DeployTimedLocker is BaseScript {
             _name: tmpName,
             _symbol: tmpSymbol,
             _endingTimestamp: tmpEndTs,
-            _cap: tmpCap
+            _cap: tmpCap,
+            _extraNotifier: extraNotifier
         });
 
         console.log("======== ADDRESSES ======== ");
@@ -67,7 +68,6 @@ contract DeployTimedLocker is BaseScript {
     function runTest(address _stakingToken, address _rewardToken) external returns (TimedLocker) {
         stakingToken = _stakingToken;
         rewardToken = _rewardToken;
-        IS_PROD = false;
         return run();
     }
 }

@@ -27,13 +27,11 @@ contract DeployVeFXSAggregator is BaseScript {
     address l1VeFXS; // _veAddresses[4]
     address l1VeFXSTotalSupplyOracle; // _veAddresses[5]
 
-    bool IS_PROD = false;
-
     function run() public broadcaster returns (VeFXSAggregator _veFXSAggregator) {
         // Initialize tempProxyAdmin and eventualAdmin
         tempProxyAdmin = msg.sender;
 
-        if (IS_PROD) {
+        if (vm.envBool("IS_PROD")) {
             // Prod deploy
             vestedFxsAddress = Constants.FraxtalMainnet.VESTED_FXS_PROXY;
             vestedFxsUtilsAddress = Constants.FraxtalMainnet.VESTED_FXS_UTILS;
@@ -55,7 +53,7 @@ contract DeployVeFXSAggregator is BaseScript {
         console.log("<<< Deploying proxy >>>");
         console.log("    --- If this fails, try forge clean");
         console.log("    --- ALSO: update the salt if you need to");
-        Proxy proxy = new Proxy{ salt: bytes32("VeFXSAggregatorABCDEFG") }(tempProxyAdmin);
+        Proxy proxy = new Proxy{ salt: bytes32("VeFXSAggregatorABCDEFGH") }(tempProxyAdmin);
 
         // Upgrade proxy to implementation and call initialize
         console.log("<<< Doing upgradeToAndCall >>>");
@@ -83,7 +81,7 @@ contract DeployVeFXSAggregator is BaseScript {
         proxy.changeAdmin({ _admin: eventualAdmin });
 
         // Set the YieldDistributor interface to the proxy (note: not needed - for testing clarity)
-        if (!IS_PROD) _veFXSAggregator = VeFXSAggregator(address(proxy));
+        if (!vm.envBool("IS_PROD")) _veFXSAggregator = VeFXSAggregator(address(proxy));
 
         console.log("======== ADDRESSES ======== ");
         console.log("Proxy: ", address(proxy));
@@ -91,7 +89,6 @@ contract DeployVeFXSAggregator is BaseScript {
     }
 
     function runTest(address[6] calldata _veAddresses) external returns (VeFXSAggregator) {
-        IS_PROD = false;
         vestedFxsAddress = _veAddresses[0];
         vestedFxsUtilsAddress = _veAddresses[1];
         fpisLocker = _veAddresses[2];

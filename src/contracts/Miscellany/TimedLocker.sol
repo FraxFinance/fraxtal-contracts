@@ -125,6 +125,7 @@ contract TimedLocker is ERC20, OwnedV2, ReentrancyGuard {
     /// @param _stakingToken The token being staked
     /// @param _endingTimestamp Timestamp when all locks become unlocked
     /// @param _cap Maximum amount of staking tokens allowed to be locked
+    /// @param _extraNotifier Additional reward notifier to add when constructing. Can add more / remove later
     constructor(
         address _owner,
         address[] memory _rewardTokens,
@@ -132,7 +133,8 @@ contract TimedLocker is ERC20, OwnedV2, ReentrancyGuard {
         string memory _name,
         string memory _symbol,
         uint256 _endingTimestamp,
-        uint256 _cap
+        uint256 _cap,
+        address _extraNotifier
     ) ERC20(_name, _symbol) OwnedV2(_owner) {
         // Set state variables
         stakingToken = ERC20(_stakingToken);
@@ -157,6 +159,9 @@ contract TimedLocker is ERC20, OwnedV2, ReentrancyGuard {
 
         // Set the owner as an allowed reward notifier
         rewardNotifiers[_owner] = true;
+
+        // Add the additional reward notifier, if present
+        if (_extraNotifier != address(0)) rewardNotifiers[_extraNotifier] = true;
 
         // Other booleans
         stakesUnlocked = false;

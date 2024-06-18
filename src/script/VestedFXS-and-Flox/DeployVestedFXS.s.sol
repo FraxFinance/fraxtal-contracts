@@ -40,7 +40,7 @@ contract DeployVestedFXS is BaseScript {
         // Initialize tempAdmin and eventualAdmin
         tempAdmin = msg.sender;
 
-        if (false) {
+        if (vm.envBool("IS_PROD")) {
             // Prod deploy
             token = Constants.FraxtalStandardProxies.FXS_PROXY;
             eventualAdmin = 0xC4EB45d80DC1F079045E75D5d55de8eD1c1090E6;

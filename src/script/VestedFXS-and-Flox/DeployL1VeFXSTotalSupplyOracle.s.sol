@@ -31,8 +31,6 @@ contract DeployL1VeFXSTotalSupplyOracle is BaseScript {
     address eventualAdmin;
     address botAddress;
 
-    bool IS_PROD = false;
-
     function run() public broadcaster returns (L1VeFXSTotalSupplyOracle _l1VeFXSTotalSupplyOracle) {
         // Initialize tempAdmin and eventualAdmin
         tempAdmin = msg.sender;
@@ -40,7 +38,7 @@ contract DeployL1VeFXSTotalSupplyOracle is BaseScript {
         uint128 _initBlkWhenTtlSupplyRead;
         uint128 _initTsWhenTtlSupplyRead;
 
-        if (IS_PROD) {
+        if (vm.envBool("IS_PROD")) {
             // Prod deploy
             eventualAdmin = 0xC4EB45d80DC1F079045E75D5d55de8eD1c1090E6;
             botAddress = 0xBB437059584e30598b3AF0154472E47E6e2a45B9;

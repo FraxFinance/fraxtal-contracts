@@ -355,30 +355,27 @@ contract VeFXSAggregator is OwnedV2AutoMsgSender, IveFXSStructs {
                 // Save tmp variable to memory
                 IlFPISStructs.LockedBalanceExtended memory _fpisLockInfo = _fpisLockerLockedBalExtds[i];
 
-                // Double check end time
-                if (_fpisLockInfo.end > block.timestamp) {
-                    // (Optional) Estimate the lock's veFXS based on amount, end, and block.timestamp
-                    uint256 _estimatedVeFXS;
-                    if (_estimateCrudeVeFXS) {
-                        _estimatedVeFXS = lFpisUtils.getCrudeExpectedLFPISOneLock(
-                            _fpisLockInfo.amount,
-                            _fpisLockInfo.end - uint128(block.timestamp)
-                        );
-                    }
-
-                    // Need to save as LockedBalanceExtendedV2
-                    _tmpActiveLocks[_activeLockIdx] = LockedBalanceExtendedV2({
-                        id: _fpisLockInfo.id,
-                        index: _fpisLockInfo.index,
-                        amount: _fpisLockInfo.amount,
-                        end: _fpisLockInfo.end,
-                        location: address(fpisLocker),
-                        estimatedCurrLockVeFXS: _estimatedVeFXS
-                    });
-
-                    // Increase the active lock index
-                    ++_activeLockIdx;
+                // (Optional) Estimate the lock's veFXS based on amount, end, and block.timestamp
+                uint256 _estimatedVeFXS;
+                if (_estimateCrudeVeFXS) {
+                    _estimatedVeFXS = lFpisUtils.getCrudeExpectedLFPISOneLock(
+                        _fpisLockInfo.amount,
+                        _fpisLockInfo.end - uint128(block.timestamp)
+                    );
                 }
+
+                // Need to save as LockedBalanceExtendedV2
+                _tmpActiveLocks[_activeLockIdx] = LockedBalanceExtendedV2({
+                    id: _fpisLockInfo.id,
+                    index: _fpisLockInfo.index,
+                    amount: _fpisLockInfo.amount,
+                    end: _fpisLockInfo.end,
+                    location: address(fpisLocker),
+                    estimatedCurrLockVeFXS: _estimatedVeFXS
+                });
+
+                // Increase the active lock index
+                ++_activeLockIdx;
 
                 unchecked {
                     ++i;
