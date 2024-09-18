@@ -12,16 +12,41 @@
 MAKE SURE TO SET YOUR `.env` to `FOUNDRY_PROFILE="fraxtal"` or `FOUNDRY_PROFILE="vefxs"` or `FOUNDRY_PROFILE="miscellany"` DUE TO SOLC VERSIONING ISSUES, AS MENTIONED ABOVE
 ```clear && source .env && forge test --fork-url $MAINNET_RPC_URL --match-path ./src/test/VestedFXS-and-Flox/e2e/E2E_VeFXS.t.sol --match-contract Fuzz_MegaTest_VeFXS -vvvvv```
 
-## Deploy Example
-```source .env && forge script src/script/VestedFXS-and-Flox/DeployL1VeFXSTotalSupplyOracle.s.sol:DeployL1VeFXSTotalSupplyOracle --chain-id 252 --with-gas-price 2500000 --rpc-url $FRAXTAL_RPC_URL --verifier-url $FRAXSCAN_API_URL --etherscan-api-key $FRAXTAL_API_KEY --optimize --optimizer-runs 100000 --use "0.8.26" --evm-version "cancun" --private-key $PK --broadcast```
+## Deploy Examples
+<!-- Fraxtal -->
+```source .env && forge script src/script/VestedFXS-and-Flox/DeployFPISLocker.s.sol:DeployFPISLocker --chain-id 252 --with-gas-price 15000 --priority-gas-price 1000 --rpc-url $FRAXTAL_RPC_URL --verifier-url $FRAXSCAN_API_URL --etherscan-api-key $FRAXTAL_API_KEY --optimize --optimizer-runs 200 --use "0.8.26" --evm-version "cancun" --private-key $PK --broadcast```
+
+```source .env && forge script src/script/VestedFXS-and-Flox/DeployL1VeFXSTotalSupplyOracle.s.sol:DeployL1VeFXSTotalSupplyOracle --chain-id 252 --with-gas-price 15000 --priority-gas-price 1000 --rpc-url $FRAXTAL_RPC_URL --verifier-url $FRAXSCAN_API_URL --etherscan-api-key $FRAXTAL_API_KEY --optimize --optimizer-runs 100000 --use "0.8.26" --evm-version "cancun" --private-key $PK --broadcast```
+
+```source .env && forge script src/script/VestedFXS-and-Flox/DeployVeFXSAggregator.s.sol --chain-id 252 --with-gas-price 15000 --priority-gas-price 1000 --rpc-url $FRAXTAL_RPC_URL --verifier-url $FRAXSCAN_API_URL --etherscan-api-key $FRAXTAL_API_KEY --optimize --optimizer-runs 100000 --use "0.8.26" --evm-version "cancun" --private-key $PK --broadcast```
+
+```source .env && forge script src/script/VestedFXS-and-Flox/DeployYieldDistributor.s.sol --chain-id 252 --with-gas-price 15000 --priority-gas-price 1000 --rpc-url $FRAXTAL_RPC_URL --verifier-url $FRAXSCAN_API_URL --etherscan-api-key $FRAXTAL_API_KEY --optimize --optimizer-runs 100000 --use "0.8.26" --evm-version "cancun" --private-key $PK --broadcast```
+
+```source .env && forge script src/script/Miscellany/DeployTimedLocker.s.sol:DeployTimedLocker --chain-id 252 --with-gas-price 15000 --priority-gas-price 1000 --rpc-url $FRAXTAL_RPC_URL --verifier-url $FRAXSCAN_API_URL --etherscan-api-key $FRAXTAL_API_KEY --optimize --optimizer-runs 100000 --use "0.8.26" --evm-version "cancun" --private-key $PK --broadcast```
+
+```source .env && forge script src/script/Miscellany/DeploySfraxMintRedeemer.s.sol:DeploySfraxMintRedeemer --chain-id 252 --with-gas-price 15000 --priority-gas-price 1000 --rpc-url $FRAXTAL_RPC_URL --verifier-url $FRAXSCAN_API_URL --etherscan-api-key $FRAXTAL_API_KEY --optimize --optimizer-runs 100000 --use "0.8.26" --evm-version "cancun" --private-key $PK --broadcast```
+
+```source .env && forge script src/script/Miscellany/DeploySfxEthMintRedeemer.s.sol:DeploySfxEthMintRedeemer --chain-id 252 --with-gas-price 15000 --priority-gas-price 1000 --rpc-url $FRAXTAL_RPC_URL --verifier-url $FRAXSCAN_API_URL --etherscan-api-key $FRAXTAL_API_KEY --optimize --optimizer-runs 100000 --use "0.8.26" --evm-version "cancun" --private-key $PK --broadcast```
+
+```source .env && forge script src/script/Miscellany/DeployL1QuitCreditorReceiverConverters.s.sol:DeployL1QuitCreditorReceiverConverters --chain-id 252 --with-gas-price 15000 --priority-gas-price 1000 --rpc-url $FRAXTAL_RPC_URL --verifier-url $FRAXSCAN_API_URL --etherscan-api-key $FRAXTAL_API_KEY --optimize --optimizer-runs 100000 --use "0.8.26" --evm-version "cancun" --private-key $PK --broadcast```
+
+```source .env && forge script src/script/VestedFXS-and-Flox/DeployDoubleOptInVeFXSDelegation.s.sol:DeployDoubleOptInVeFXSDelegation --chain-id 252 --with-gas-price 15000 --priority-gas-price 1000 --rpc-url $FRAXTAL_RPC_URL --verifier-url $FRAXSCAN_API_URL --etherscan-api-key $FRAXTAL_API_KEY --optimize --optimizer-runs 100000 --use "0.8.26" --evm-version "cancun" --private-key $PK --broadcast```
+
+<!-- ETH Mainnet -->
+```source .env && forge script src/script/Miscellany/DeployFraxFarmQuitCreditors_UniV3.s.sol:DeployFraxFarmQuitCreditors_UniV3 --chain-id 1 --with-gas-price 10000000000 --priority-gas-price 1000 --rpc-url $MAINNET_RPC_URL --verifier-url $ETHERSCAN_API_URL --etherscan-api-key $ETHERSCAN_API_KEY --optimize --optimizer-runs 100000 --use "0.8.26" --evm-version "cancun" --private-key $PK --broadcast```
 
 ## Upgrade Proxy Example
-```source .env && forge script src/script/VestedFXS-and-Flox/UpgradeFPISLocker.s.sol:UpgradeFPISLocker --chain-id 252 --with-gas-price 2500000 --rpc-url $FRAXTAL_RPC_URL --verifier-url $FRAXSCAN_API_URL --etherscan-api-key $FRAXTAL_API_KEY --optimize --optimizer-runs 200 --use "0.8.23" --evm-version "paris" --private-key $PK --broadcast```
+```source .env && forge script src/script/VestedFXS-and-Flox/UpgradeFPISLocker.s.sol:UpgradeFPISLocker --chain-id 252 --with-gas-price 15000 --priority-gas-price 1000 --rpc-url $FRAXTAL_RPC_URL --verifier-url $FRAXSCAN_API_URL --etherscan-api-key $FRAXTAL_API_KEY --optimize --optimizer-runs 200 --use "0.8.23" --evm-version "paris" --private-key $PK --broadcast```
+
+```source .env && forge script src/script/VestedFXS-and-Flox/UpgradeVeFXSAggregator.s.sol:UpgradeVeFXSAggregator --chain-id 252 --with-gas-price 15000 --priority-gas-price 1000 --rpc-url $FRAXTAL_RPC_URL --verifier-url $FRAXSCAN_API_URL --etherscan-api-key $FRAXTAL_API_KEY --optimize --optimizer-runs 100000 --use "0.8.26" --evm-version "cancun" --private-key $PK --broadcast```
 
 ## Verification
 ### Regular contracts
 Try using forge verify-contract first
 ```source .env && forge verify-contract --chain-id 252 --watch --num-of-optimizations 10000 --etherscan-api-key $FRAXTAL_API_KEY --constructor-args $(cast abi-encode "constructor(address)" "0x007FD070a7E1B0fA1364044a373Ac1339bAD89CF" true) 0xC540f05BF5a09336078634D65E46242DFBa55030 src/contracts/VestedFXS-and-Flox/VestedFXS/VestedFXSUtils.sol:VestedFXSUtils```
+```source .env && forge verify-contract --chain-id 252 --watch --compiler-version "0.8.26" --evm-version "cancun" --num-of-optimizations 100000 --rpc-url $FRAXTAL_RPC_URL --etherscan-api-key $FRAXTAL_API_KEY --constructor-args 0x000000000000000000000000625e700125ff054f75e5348497cbfab1ee4b7a40 0xBFc4D34Db83553725eC6c768da71D2D9c1456B55 src/script/Miscellany/Proxy.sol:Proxy```
+CHECK THE PROXY OUT FOLDER TO SEE THE OPTS/RUNS/EVM/COMP STUFF BECAUSE SOMETIMES IT IS OLDER AND IS DIFFERENT FROM THE IMPLEMENTATION!!!
+
 
 If this fails, try `forge flatten`
 1) `forge flatten --output src/flattened.sol src/contracts/VestedFXS-and-Flox/VestedFXS/VeFXSYieldDistributor.sol`
@@ -30,13 +55,13 @@ If this fails, try `forge flatten`
 
 ### Verifying a proxy
 1) https://fraxscan.com/proxycontractchecker?a=PROXY_ADDRESS_HERE
-2) TRY ```source .env && forge verify-contract --chain-id 252 --watch --optimize --num-of-optimizations 10000 --evm-version "paris" --etherscan-api-key $FRAXTAL_API_KEY --constructor-args $(cast abi-encode "constructor(address)" "0x4600d3b12c39af925c2c07c487d31d17c1e32a35" true) 0x007FD070a7E1B0fA1364044a373Ac1339bAD89CF src/script/VestedFXS-and-Flox/Proxy.sol:Proxy```
+2) TRY ```source .env && forge verify-contract --chain-id 252 --watch --num-of-optimizations 100000 --evm-version "cancun" --etherscan-api-key $FRAXTAL_API_KEY --constructor-args $(cast abi-encode "constructor(address)" "0x625e700125FF054f75e5348497cBFab1ee4b7A40" true) 0x437E9F65cA234eCfed12149109587139d435AD35 src/script/VestedFXS-and-Flox/Proxy.sol:Proxy```
 3) OR (2) but with ```--show-standard-json-input``` and paste that into the verifier
 4) If you are still having problems, make sure the constructor args are padded properly, etc. Sometimes Etherscan guesses the wrong ones.
 
 
 ### Code Coverage
-1) ```forge coverage --report lcov && genhtml lcov.info -o report --branch-coverage```. 
+1) ```forge coverage --ir-minimum --report lcov && genhtml lcov.info -o report --branch-coverage --ignore-errors category```. 
 2) Go to /report and browse the html 
 3) OPTIONAL: ```forge coverage --report summary``` (shows a coverage report in the terminal)
 4) OPTIONAL: VS Code: install Coverage Gutters or a similar extension to see the coverage inside VSCode tabs

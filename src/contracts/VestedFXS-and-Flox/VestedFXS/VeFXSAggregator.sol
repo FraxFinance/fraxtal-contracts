@@ -127,7 +127,7 @@ contract VeFXSAggregator is OwnedV2AutoMsgSender, IveFXSStructs {
 
     constructor() {
         // Set the contract as initialized
-        wasInitialized = true;
+        // wasInitialized = true;
     }
 
     /**
@@ -169,6 +169,28 @@ contract VeFXSAggregator is OwnedV2AutoMsgSender, IveFXSStructs {
     // ==============================================================================
     // VIEWS
     // ==============================================================================
+
+    /// @notice Same as ttlCombinedVeFXS. For backwards-compatibility
+    /// @param _addr The address to check
+    /// @return _balance The veFXS balance of the _addr
+    function balanceOf(address _addr) public view returns (uint256 _balance) {
+        return ttlCombinedVeFXS(_addr);
+    }
+
+    /// @notice Returns the decimals
+    function decimals() public view returns (uint256) {
+        return 18;
+    }
+
+    /// @notice Returns the name
+    function name() public view returns (string memory) {
+        return "Vested FXS";
+    }
+
+    /// @notice Returns the symbol
+    function symbol() public view returns (string memory) {
+        return "veFXS";
+    }
 
     /// @notice Total veFXS of a user from multiple different sources, such as the FPIS Locker, L1VeFXS, and Fraxtal veFXS
     /// @param _user The user to check
