@@ -21,7 +21,6 @@ pragma solidity >=0.8.0;
  */
 import { ERC20 } from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import { IERC20PermitPermissionedOptiMintable } from "./interfaces/IERC20PermitPermissionedOptiMintable.sol";
 import { Math } from "@openzeppelin/contracts/utils/math/Math.sol";
 import { OwnedV2 } from "./OwnedV2.sol";
 import { ReentrancyGuard } from "@openzeppelin/contracts/security/ReentrancyGuard.sol";
@@ -41,7 +40,8 @@ contract TimedLocker is ERC20, OwnedV2, ReentrancyGuard {
     uint256 public immutable endingTimestamp;
 
     /// @notice Maximum amount of staking token that can be staked
-    uint256 public immutable cap;
+    /// @dev Can be increased only if more reward tokens are simultaneously provided, to keep the new rewardPerSecondPerToken >= old rewardPerSecondPerToken
+    uint256 public cap;
 
     /// @notice The token being staked
     ERC20 public stakingToken;
@@ -201,6 +201,38 @@ contract TimedLocker is ERC20, OwnedV2, ReentrancyGuard {
         return Math.min(block.timestamp, periodFinish);
     }
 
+    /// @notice Minimum amount of additional reward tokens needed so rewardPerSecondPerToken remains the same after a cap increase
+    /// @param _newCap The new cap you want to increase to
+    /// @return _minRewRates Minimum rewardRate needed after the cap is raised
+    /// @return _minAddlTkns Minimum amount of additional reward tokens needed
+    function minAddlRewTknsForCapIncrease(
+        uint256 _newCap
+    ) public view returns (uint256[] memory _minRewRates, uint256[] memory _minAddlTkns) {
+        // Cap can only increase
+        if (_newCap < cap) revert CapCanOnlyIncrease();
+
+        // Initialize return arrays
+        _minRewRates = new uint256[](rewardTokens.length);
+        _minAddlTkns = new uint256[](rewardTokens.length);
+
+        // See how much time is left
+        uint256 _timeLeft = endingTimestamp - block.timestamp;
+
+        // Loop through the reward tokens
+        for (uint256 i = 0; i < rewardTokens.length; ) {
+            // Solve for the new reward rate, assuming (Rate / Tokens) is constant
+            // Round up by 1 wei
+            _minRewRates[i] = ((rewardRates[i] * _newCap) + 1) / cap;
+
+            // Calculate the additional tokens needed
+            _minAddlTkns[i] = _timeLeft * (_minRewRates[i] - rewardRates[i]);
+
+            unchecked {
+                ++i;
+            }
+        }
+    }
+
     /// @notice The calculated rewardPerTokenStored accumulator
     /// @return _rtnRewardsPerTokenStored Array of rewardsPerTokenStored
     function rewardPerToken() public view returns (uint256[] memory _rtnRewardsPerTokenStored) {
@@ -217,7 +249,6 @@ contract TimedLocker is ERC20, OwnedV2, ReentrancyGuard {
                 _rtnRewardsPerTokenStored[i] =
                     rewardsPerTokenStored[i] +
                     (((lastTimeRewardApplicable() - lastUpdateTime) * rewardRates[i] * 1e18) / totalSupply());
-
                 unchecked {
                     ++i;
                 }
@@ -370,7 +401,7 @@ contract TimedLocker is ERC20, OwnedV2, ReentrancyGuard {
 
     /// @notice Stake stakingToken for vault tokens
     /// @param _amount The amount of stakingToken
-    function stake(uint256 _amount) public updateRewards(msg.sender) {
+    function stake(uint256 _amount) public nonReentrant updateRewards(msg.sender) {
         // Do checks
         if (block.timestamp >= endingTimestamp) revert LockerHasEnded();
         if (stakingPaused) revert StakingPaused();
@@ -394,7 +425,10 @@ contract TimedLocker is ERC20, OwnedV2, ReentrancyGuard {
     /// @notice Withdraw stakingToken from vault tokens.
     /// @param _vaultTknAmount Amount of vault tokens to use
     /// @param _collectRewards Whether to also collect rewards
-    function withdraw(uint256 _vaultTknAmount, bool _collectRewards) public returns (uint256[] memory _rtnRewards) {
+    function withdraw(
+        uint256 _vaultTknAmount,
+        bool _collectRewards
+    ) public nonReentrant returns (uint256[] memory _rtnRewards) {
         if ((block.timestamp < endingTimestamp) && !(stakesUnlocked || withdrawalOnlyShutdown)) {
             revert LockerStillActive();
         }
@@ -405,7 +439,7 @@ contract TimedLocker is ERC20, OwnedV2, ReentrancyGuard {
 
         // Give the stakingToken to the msg.sender
         // Should throw if insufficient balance
-        stakingToken.transfer(msg.sender, _vaultTknAmount);
+        TransferHelper.safeTransfer(address(stakingToken), msg.sender, _vaultTknAmount);
 
         // Collect rewards
         _rtnRewards = new uint256[](rewardTokens.length);
@@ -436,7 +470,7 @@ contract TimedLocker is ERC20, OwnedV2, ReentrancyGuard {
             // Do reward accounting
             if (_rtnRewards[i] > 0) {
                 rewards[msg.sender][i] = 0;
-                ERC20(rewardTokens[i]).transfer(_destinationAddress, _rtnRewards[i]);
+                TransferHelper.safeTransfer(rewardTokens[i], _destinationAddress, _rtnRewards[i]);
 
                 emit RewardPaid(msg.sender, _rtnRewards[i], rewardTokens[i], _destinationAddress);
             }
@@ -452,9 +486,9 @@ contract TimedLocker is ERC20, OwnedV2, ReentrancyGuard {
 
     /// @notice Supply rewards. Only callable by whitelisted addresses.
     /// @param _amounts Amount of each reward token to add
-    function notifyRewardAmounts(uint256[] memory _amounts) external {
-        // Only whitelisted addresses can notify rewards
-        if (!rewardNotifiers[msg.sender]) revert SenderNotRewarder();
+    function notifyRewardAmounts(uint256[] memory _amounts) public {
+        // Only the owner and the whitelisted addresses can notify rewards
+        if (!((owner == msg.sender) || rewardNotifiers[msg.sender])) revert SenderNotOwnerOrRewarder();
 
         // Make sure the locker has not ended
         if (block.timestamp >= endingTimestamp) revert LockerHasEnded();
@@ -501,13 +535,47 @@ contract TimedLocker is ERC20, OwnedV2, ReentrancyGuard {
         withdrawalOnlyShutdown = true;
     }
 
+    /// @notice Increase the staking token cap. Can be increased only if more reward tokens are simultaneously provided, to keep the new rewardPerSecondPerToken >= old rewardPerSecondPerToken.
+    /// @param _newCap The address of the token
+    /// @param _addlRewTknAmounts The amount(s) of reward tokens being supplied as part of this cap increase.
+    function increaseCapWithRewards(uint256 _newCap, uint256[] memory _addlRewTknAmounts) external onlyOwner {
+        // Cap can only increase
+        if (_newCap < cap) revert CapCanOnlyIncrease();
+
+        // Sync first
+        sync();
+
+        // Fetch the calculated new rewardRates as well as the amount of additional tokens needed
+        (uint256[] memory _minRewRates, uint256[] memory _minAddlTkns) = minAddlRewTknsForCapIncrease(_newCap);
+
+        // Make sure enough reward tokens were supplied
+        for (uint256 i = 0; i < rewardTokens.length; i++) {
+            if (_addlRewTknAmounts[i] < _minAddlTkns[i]) revert NotEnoughAddlRewTkns();
+        }
+
+        // Increase the cap
+        cap = _newCap;
+
+        // Add in the new rewards
+        notifyRewardAmounts(_addlRewTknAmounts);
+
+        // Compare the new rewardRate with the calculated minimum
+        // New must be >= old
+        for (uint256 i = 0; i < rewardTokens.length; i++) {
+            if (rewardRates[i] < _minRewRates[i]) {
+                revert NotEnoughAddlRewTkns();
+            }
+        }
+    }
+
     /// @notice Added to support recovering LP Rewards and other mistaken tokens from other systems to be distributed to holders
-    /// @param tokenAddress The address of the token
-    /// @param tokenAmount The amount of the token
-    function recoverERC20(address tokenAddress, uint256 tokenAmount) external onlyOwner {
+    /// @param _tokenAddress The address of the token
+    /// @param _tokenAmount The amount of the token
+    function recoverERC20(address _tokenAddress, uint256 _tokenAmount) external onlyOwner {
         // Only the owner address can ever receive the recovery withdrawal
-        ERC20(tokenAddress).transfer(owner, tokenAmount);
-        emit Recovered(tokenAddress, tokenAmount);
+        TransferHelper.safeTransfer(_tokenAddress, owner, _tokenAmount);
+
+        emit Recovered(_tokenAddress, _tokenAmount);
     }
 
     /// @notice Toggle the ability to syncEarned externally via bulkSyncEarnedUsers
@@ -543,6 +611,9 @@ contract TimedLocker is ERC20, OwnedV2, ReentrancyGuard {
 
     /* ========== ERRORS ========== */
 
+    /// @notice When you are trying to lower the cap, which is not allowed
+    error CapCanOnlyIncrease();
+
     /// @notice When you are trying to lock more tokens than are allowed
     error Capped();
 
@@ -564,8 +635,11 @@ contract TimedLocker is ERC20, OwnedV2, ReentrancyGuard {
     /// @notice If reward collections are paused
     error RewardCollectionIsPaused();
 
-    /// @notice If the sender is not a rewarder
-    error SenderNotRewarder();
+    /// @notice When the cap is increased, the rewardPerSecondPerToken must either increase or stay the same
+    error NotEnoughAddlRewTkns();
+
+    /// @notice If the sender is not the owner or a rewarder
+    error SenderNotOwnerOrRewarder();
 
     /// @notice If staking has been paused
     error StakingPaused();

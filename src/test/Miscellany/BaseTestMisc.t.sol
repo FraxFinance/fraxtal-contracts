@@ -2,14 +2,17 @@
 pragma solidity >=0.8.0;
 
 import { FraxTest } from "frax-std/FraxTest.sol";
+import { DeployFraxFarmQuitCreditors_UniV3 } from "src/script/Miscellany/DeployFraxFarmQuitCreditors_UniV3.s.sol";
 import { DeploySfraxMintRedeemer } from "src/script/Miscellany/DeploySfraxMintRedeemer.s.sol";
 import { DeployTimedLocker } from "src/script/Miscellany/DeployTimedLocker.s.sol";
 import { FraxtalERC4626MintRedeemer } from "src/contracts/Miscellany/FraxtalERC4626MintRedeemer.sol";
+import { IERC20Metadata } from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 import { ManualPriceOracle } from "src/contracts/Miscellany/ManualPriceOracle.sol";
 import { MintableBurnableTestERC20 } from "src/test/VestedFXS-and-Flox/helpers/MintableBurnableTestERC20.sol";
+import { FraxFarmQuitCreditor_UniV3 } from "src/contracts/Miscellany/FraxFarmQuitCreditor/FraxFarmQuitCreditor_UniV3.sol";
+import { INonfungiblePositionManager, ComboOracle_UniV2_UniV3, IFraxFarmUniV3 } from "src/contracts/Miscellany/FraxFarmQuitCreditor/Imports.sol";
 import { TimedLocker } from "src/contracts/Miscellany/TimedLocker.sol";
 import { console } from "frax-std/FraxTest.sol";
-import { FraxTest } from "frax-std/FraxTest.sol";
 import "src/Constants.sol" as Constants;
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
@@ -22,6 +25,21 @@ contract BaseTestMisc is FraxTest, Constants.Helper {
     address public sfxMRAddress;
     ManualPriceOracle public fraxOracle;
     ManualPriceOracle public sfraxOracle;
+
+    // QuitCreditor
+    // =========================================
+    IERC20Metadata public mainnetFXS;
+    INonfungiblePositionManager public univ3NftPositionMgr;
+    IFraxFarmUniV3 public fraxFarmUniV3FraxUsdc;
+    FraxFarmQuitCreditor_UniV3 public quitCreditorFRAXDAI;
+    FraxFarmQuitCreditor_UniV3 public quitCreditorFRAXUSDC;
+    IERC20Metadata public qcToken0;
+    IERC20Metadata public qcToken1;
+    uint256[2] public qcMissingDecimals;
+
+    // // FRAXToFXBLockerRouter
+    // // =========================================
+    // FRAXToFXBLockerRouter public lockerRouter;
 
     // TimedLocker
     // =========================================
@@ -47,7 +65,7 @@ contract BaseTestMisc is FraxTest, Constants.Helper {
     address payable public frank;
 
     function defaultSetup() public {
-        vm.createSelectFork(vm.envString("MAINNET_RPC_URL"), 19_820_000);
+        vm.createSelectFork(vm.envString("MAINNET_RPC_URL"), 20_412_924);
 
         // FraxtalERC4626MintRedeemer
         // ----------------------------------------------
@@ -63,6 +81,29 @@ contract BaseTestMisc is FraxTest, Constants.Helper {
         hoax(sfraxMintRedeemer.owner());
         sfraxMintRedeemer.nominateNewOwner(address(this));
         sfraxMintRedeemer.acceptOwnership();
+
+        // // FRAXToFXBLockerRouter
+        // // ----------------------------------------------
+        // DeployFRAXToFXBLockerRouter lockerRouterDeployer = new DeployFRAXToFXBLockerRouter();
+        // lockerRouter = lockerRouterDeployer.runTest();
+
+        // QuitCreditor FRAX/USDC
+        // ----------------------------------------------
+        mainnetFXS = IERC20Metadata(0x3432B6A60D23Ca0dFCa7761B7ab56459D9C964D0);
+        univ3NftPositionMgr = INonfungiblePositionManager(0xC36442b4a4522E871399CD717aBDD847Ab11FE88);
+        fraxFarmUniV3FraxUsdc = IFraxFarmUniV3(0x3EF26504dbc8Dd7B7aa3E97Bc9f3813a9FC0B4B0);
+        DeployFraxFarmQuitCreditors_UniV3 quitCreditorDeployers = new DeployFraxFarmQuitCreditors_UniV3();
+        (quitCreditorFRAXDAI, quitCreditorFRAXUSDC) = quitCreditorDeployers.runTest();
+
+        // Just do FRAX/USDC for the tests
+        qcToken0 = IERC20Metadata(fraxFarmUniV3FraxUsdc.uni_token0());
+        qcToken1 = IERC20Metadata(fraxFarmUniV3FraxUsdc.uni_token1());
+        qcMissingDecimals[0] = quitCreditorFRAXUSDC.missingDecimals(0);
+        qcMissingDecimals[1] = quitCreditorFRAXUSDC.missingDecimals(1);
+
+        // Make the QuitCreditor-related addresses persistent
+        vm.makePersistent(address(univ3NftPositionMgr), address(fraxFarmUniV3FraxUsdc));
+        vm.makePersistent(address(quitCreditorFRAXDAI), address(quitCreditorFRAXUSDC));
 
         // TimedLocker
         // ----------------------------------------------

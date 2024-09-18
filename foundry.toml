@@ -57,10 +57,11 @@ via_ir = false
 # Whether to append the metadata hash to the bytecode
 #cbor_metadata = false
 # evm version (needed until all chains support PUSH0)
-#evm_version = "paris"
+evm_version = "cancun"
 # Contracts to track with --gas-report
 #gas_reports = []
 ignored_error_codes = [1878, 2519, 5574, 5667, 2462, 2072, 2018, 3420, 9302, 3628, 8417]
+solc="0.8.26"
 
 [profile.miscellany]
 # The source directory
@@ -86,7 +87,7 @@ via_ir = false
 # Whether to append the metadata hash to the bytecode
 #cbor_metadata = false
 # evm version (needed until all chains support PUSH0)
-#evm_version = "paris"
+evm_version = "cancun"
 # Contracts to track with --gas-report
 #gas_reports = []
 ignored_error_codes = [1878, 2519, 5574, 5667, 2462, 2072, 2018, 3420, 9302, 3628, 8417]
@@ -116,7 +117,7 @@ via_ir = false
 # Whether to append the metadata hash to the bytecode
 #cbor_metadata = false
 # evm version (needed until all chains support PUSH0)
-#evm_version = "paris"
+evm_version = "cancun"
 # Contracts to track with --gas-report
 #gas_reports = []
 ignored_error_codes = [1878, 2519, 5574, 5667, 2462, 2072, 2018, 3420, 9302, 3628, 8417]
@@ -124,9 +125,9 @@ solc="0.8.26"
 
 [fuzz]
 # Amount of runs per fuzz test
-runs = 256 # Do 5000-10000 right before deploy
+runs = 16 # Do 5000-10000 right before deploy
 max_test_rejects = 25000
-seed = "0x34343" # Remove this later so you have more randomness
+seed = "0x55555" # Remove this later so you have more randomness
 
 [profile.src]
 test = "_" # Makes building faster

@@ -27,18 +27,18 @@ contract DeployTimedLocker is BaseScript {
 
         if (vm.envBool("IS_PROD")) {
             // Prod deploy
-            stakingToken = Constants.FraxtalMainnet.FXB_20261231;
+            stakingToken = Constants.FraxtalMainnet.FXB_20271231;
             rewardToken = Constants.FraxtalStandardProxies.FXS_PROXY;
-            tmpName = "Locked FXB 20261231";
-            tmpSymbol = "lFXB_20261231";
-            tmpEndTs = 1_798_761_600;
+            tmpName = "FXB20271231 Locked 20250707";
+            tmpSymbol = "LFXB20271231_20250707";
+            tmpEndTs = 1_751_871_600; // 7/7/2025
             tmpCap = 2_500_000e18;
             eventualAdmin = 0xC4EB45d80DC1F079045E75D5d55de8eD1c1090E6;
             extraNotifier = 0x5180db0237291A6449DdA9ed33aD90a38787621c;
         } else {
             // Test deploy
-            tmpName = "Locked FXB 20251231";
-            tmpSymbol = "lFXB_20251231";
+            tmpName = "FXB20251231 Locked 20260101";
+            tmpSymbol = "LFXB20271231_20260101";
             tmpEndTs = 1_767_254_400;
             tmpCap = 2_500_000e18;
             eventualAdmin = msg.sender;

@@ -14,6 +14,7 @@ contract Unit_Test_TimedLocker is BaseTestMisc {
     // -----------------------------
     uint256 _ttlRewardAmount;
     uint256 _aliceCollectedFXS;
+    uint256 _initialDaysLeftE18;
     mapping(address => uint256) public _startFXS; // User -> Initial FXS balance
     mapping(address => uint256) public _endFXS; // User -> Ending FXS balance
 
@@ -42,6 +43,7 @@ contract Unit_Test_TimedLocker is BaseTestMisc {
         {
             // See how many days are left in the locker
             uint256 _daysLeftE18 = ((timedLocker.periodFinish() - block.timestamp) * 1e18) / 86_400;
+            _initialDaysLeftE18 = _daysLeftE18;
 
             // Do 1 FXS per day for this test
             uint256[] memory _rewardAmts = new uint256[](1);
@@ -429,6 +431,149 @@ contract Unit_Test_TimedLocker is BaseTestMisc {
         checkRewardTotalEmissions();
     }
 
+    function test_increaseCapWithRewardsBasic() public {
+        TimedLockerSetup();
+
+        // Setup rewards and Alice
+        BasicAliceSetup();
+
+        // Note the initial rewardPerToken
+        console.log("<<<<<<<<<<<<<<<<<<<<<<<<<<<<<< INITIAL >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>");
+        uint256[] memory _initialRewardPerToken = timedLocker.rewardPerToken();
+        uint256 _initialRewardsPerTokenStored0 = timedLocker.rewardsPerTokenStored(0);
+        uint256[] memory _initialRewardRates = new uint256[](1);
+        _initialRewardRates[0] = timedLocker.rewardRates(0);
+        uint256 _initialAtCapRewardPerSecondPerToken0 = (_initialRewardRates[0] * 1e18) / timedLocker.cap();
+        console.log("Initial cap: ", timedLocker.cap());
+        console.log("_initialRewardPerToken[0]: ", _initialRewardPerToken[0]);
+        console.log("_initialRewardsPerTokenStored0: ", _initialRewardsPerTokenStored0);
+        console.log("_initialRewardRates[0]: ", _initialRewardRates[0]);
+        console.log("_initialAtCapRewardPerSecondPerToken0: ", _initialAtCapRewardPerSecondPerToken0);
+
+        // Initialize new token amounts for later
+        uint256[] memory _addlRewTknAmounts = new uint256[](1);
+
+        // Try to increase the cap as a random user (should fail)
+        hoax(claire);
+        vm.expectRevert(OwnedV2.OnlyOwner.selector);
+        timedLocker.increaseCapWithRewards(5_000_000e18, _addlRewTknAmounts);
+
+        // Try to decrease the cap (should fail)
+        vm.expectRevert(TimedLocker.CapCanOnlyIncrease.selector);
+        timedLocker.increaseCapWithRewards(1_000_000e18, _addlRewTknAmounts);
+
+        // Try to increase the cap with insufficient new reward tokens (should fail)
+        vm.expectRevert(TimedLocker.NotEnoughAddlRewTkns.selector);
+        timedLocker.increaseCapWithRewards(5_000_000e18, _addlRewTknAmounts);
+
+        // Update the _addlRewTknAmounts so the rewardPerSecondPerToken will remain the same after the cap increase
+        (uint256[] memory _newRewRate, uint256[] memory _minAddlTkns) = timedLocker.minAddlRewTknsForCapIncrease(5_000_000e18);
+        _addlRewTknAmounts[0] = _minAddlTkns[0];
+
+        // Increase the cap with sufficient new reward tokens
+        fxs.approve(timedLockerAddress, _addlRewTknAmounts[0]);
+        timedLocker.increaseCapWithRewards(5_000_000e18, _addlRewTknAmounts);
+
+        // Make sure the cap actually increased
+        assertEq(timedLocker.cap(), 5_000_000e18, "Cap was never increased. Should be 5000000");
+
+        // put minAddlRewTknsForCapIncrease in increaseCapWithRewards?
+        // also check test_increaseCapWithRewardsAPR
+
+        // Note the final rewardPerToken
+        console.log("<<<<<<<<<<<<<<<<<<<<<<<<<<<<<< FINAL >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>");
+        uint256[] memory _finalRewardPerToken = timedLocker.rewardPerToken();
+        uint256 _finalRewardsPerTokenStored0 = timedLocker.rewardsPerTokenStored(0);
+        uint256[] memory _finalRewardRates = new uint256[](1);
+        _finalRewardRates[0] = timedLocker.rewardRates(0);
+        uint256 _finalAtCapRewardPerSecondPerToken0 = (_finalRewardRates[0] * 1e18) / timedLocker.cap();
+        console.log("Final cap: ", timedLocker.cap());
+        console.log("_finalRewardPerToken[0]: ", _finalRewardPerToken[0]);
+        console.log("_finalRewardsPerTokenStored0: ", _finalRewardsPerTokenStored0);
+        console.log("_finalRewardRates[0]: ", _finalRewardRates[0]);
+        console.log("_finalAtCapRewardPerSecondPerToken0: ", _finalAtCapRewardPerSecondPerToken0);
+    }
+
+    function test_increaseCapWithRewardsAPR() public {
+        TimedLockerSetup();
+
+        // Mark initial FXS balances
+        markInitialFXSBalances();
+
+        // Notify rewards to target TARGET_APR_E18 using FXS_PRICE_E18 and TARGET_FXB_AMOUNT_FOR_APR
+        console.log("<<< Put rewards in the TimedLocker >>>");
+        {
+            // See how many days are left in the locker
+            uint256 _daysLeftE6 = ((timedLocker.periodFinish() - block.timestamp) * 1e6) / 86_400;
+
+            // Calculate the amount of FXS needed assuming TARGET_FXB_AMOUNT_FOR_APR is staked
+            uint256 _fxsNeededAllTimeE18 = (TARGET_APR_E18 * _daysLeftE6 * TARGET_FXB_AMOUNT_FOR_APR) / (365.25e6 * FXS_PRICE_E18);
+            uint256 _fxsNeededOneYearTimeE18 = (TARGET_APR_E18 * TARGET_FXB_AMOUNT_FOR_APR) / (FXS_PRICE_E18);
+            console.log("Days left: ", _daysLeftE6 / 1e6);
+            console.log("FXS needed [Total] for %s%% APR: %s [$%s]", (TARGET_APR_E18 * 100) / 1e18, _fxsNeededAllTimeE18 / 1e18, (_fxsNeededAllTimeE18 * FXS_PRICE_E18) / 1e36);
+            console.log("FXS needed [1-year only] for %s%% APR: %s [$%s]", (TARGET_APR_E18 * 100) / 1e18, _fxsNeededOneYearTimeE18 / 1e18, (_fxsNeededOneYearTimeE18 * FXS_PRICE_E18) / 1e36);
+
+            // Feed the locker
+            uint256[] memory _rewardAmts = new uint256[](1);
+            _rewardAmts[0] = _fxsNeededAllTimeE18;
+            _ttlRewardAmount = _fxsNeededAllTimeE18;
+            fxs.approve(timedLockerAddress, _rewardAmts[0]);
+            timedLocker.notifyRewardAmounts(_rewardAmts);
+        }
+
+        // Approve and stake as Alice
+        console.log("<<< Alice stakes TARGET_FXB_AMOUNT_FOR_APR >>>");
+        hoax(alice);
+        fxb.approve(timedLockerAddress, TARGET_FXB_AMOUNT_FOR_APR);
+        hoax(alice);
+        timedLocker.stake(TARGET_FXB_AMOUNT_FOR_APR);
+
+        // Wait 10 days
+        console.log("<<< Wait 10 days >>>");
+        _warpToAndRollOne(block.timestamp + (10 days));
+
+        // Print the APR before cap increase
+        (uint256 _currAPR, uint256 _fxsNeeded) = calcFXSNeededForTargetAPR(TARGET_APR_E18);
+        console.log("Current APR [before cap increase]: %s", _currAPR);
+
+        // Check that Alice's APR matches the target
+        console.log("<<< Check Alice's APR (before cap raise) >>>");
+        {
+            uint256 _currAPR = getUserEffectiveAPR(alice, block.timestamp - (10 days), 0);
+            uint256 _currEarnings = getFXSEarnings(alice);
+            console.log("Alice's current effective APR: %s", _currAPR);
+            console.log("Alice's FXS earnings: %s [$%s]", _currEarnings / 1e18, (_currEarnings * FXS_PRICE_E18) / 1e36);
+
+            // Alice's APR should be near the target since she staked TARGET_FXB_AMOUNT_FOR_APR
+            assertApproxEqRel(_currAPR, TARGET_APR_E18, 0.01e18, "Alice's APR should be near the target");
+        }
+
+        // Prepare to increase the cap
+        (uint256[] memory _newRewRate, uint256[] memory _minAddlTkns) = timedLocker.minAddlRewTknsForCapIncrease(5_000_000e18);
+        uint256[] memory _addlRewTknAmounts = new uint256[](1);
+        _addlRewTknAmounts[0] = _minAddlTkns[0] + 100e18;
+
+        // Increase the cap with sufficient new reward tokens
+        fxs.approve(timedLockerAddress, _addlRewTknAmounts[0]);
+        timedLocker.increaseCapWithRewards(5_000_000e18, _addlRewTknAmounts);
+
+        // Print the APR after cap increase
+        (_currAPR, _fxsNeeded) = calcFXSNeededForTargetAPR(TARGET_APR_E18);
+        console.log("Current APR [after cap increase]: %s", _currAPR);
+
+        // Check that Alice's APR matches the target after raising the cap
+        console.log("<<< Check Alice's APR (after cap raise) >>>");
+        {
+            uint256 _currAPR = getUserEffectiveAPR(alice, block.timestamp - (10 days), 0);
+            uint256 _currEarnings = getFXSEarnings(alice);
+            console.log("Alice's current effective APR: %s", _currAPR);
+            console.log("Alice's FXS earnings: %s [$%s]", _currEarnings / 1e18, (_currEarnings * FXS_PRICE_E18) / 1e36);
+
+            // Alice's APR should be near the target since she staked TARGET_FXB_AMOUNT_FOR_APR
+            assertApproxEqRel(_currAPR, TARGET_APR_E18, 0.01e18, "Alice's APR should be near the target");
+        }
+    }
+
     function test_miscPauses() public {
         TimedLockerSetup();
 
@@ -628,7 +773,7 @@ contract Unit_Test_TimedLocker is BaseTestMisc {
         hoax(claire);
         uint256[] memory _rewardAmts = new uint256[](1);
         _rewardAmts[0] = 1e18;
-        vm.expectRevert(TimedLocker.SenderNotRewarder.selector);
+        vm.expectRevert(TimedLocker.SenderNotOwnerOrRewarder.selector);
         timedLocker.notifyRewardAmounts(_rewardAmts);
 
         // Random user Claire should not be able to add herself as a reward notifier

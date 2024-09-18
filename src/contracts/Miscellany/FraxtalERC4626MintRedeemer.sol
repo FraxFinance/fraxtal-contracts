@@ -116,7 +116,7 @@ contract FraxtalERC4626MintRedeemer is OwnedV2AutoMsgSender, ReentrancyGuard {
         fee = _fee;
 
         // Set initial oracle time tolerance
-        oracleTimeTolerance = 28_800; // Default to 8 hours
+        oracleTimeTolerance = 86_400; // Default to 24 hours
 
         // Set the contract as initialized
         wasInitialized = true;
@@ -603,6 +603,11 @@ contract FraxtalERC4626MintRedeemer is OwnedV2AutoMsgSender, ReentrancyGuard {
     /// @param shares Amount of shares given out
     event Deposit(address indexed sender, address indexed owner, uint256 assets, uint256 shares);
 
+    /// @notice When ERC20 tokens were recovered
+    /// @param token Token address
+    /// @param amount Amount of tokens collected
+    event RecoveredERC20(address token, uint256 amount);
+
     /// @notice When a withdrawal/redemption has occured
     /// @param sender The transaction sender
     /// @param receiver Reciever of the assets
@@ -658,11 +663,6 @@ contract FraxtalERC4626MintRedeemer is OwnedV2AutoMsgSender, ReentrancyGuard {
     /// @notice When the price of the oracle is stale
     /// @param symbol Symbol of the token whose oracle is stale
     error OracleIsStale(string symbol);
-
-    /// @notice When ERC20 tokens were recovered
-    /// @param token Token address
-    /// @param amount Amount of tokens collected
-    event RecoveredERC20(address token, uint256 amount);
 
     /// @notice When you are attempting to pull tokens from an owner address that is not msg.sender
     error TokenOwnerShouldBeSender();

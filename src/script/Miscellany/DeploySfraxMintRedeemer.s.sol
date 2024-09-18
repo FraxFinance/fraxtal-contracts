@@ -79,7 +79,7 @@ contract DeploySfraxMintRedeemer is BaseScript {
 
         // Deploy FraxtalERC4626MintRedeemer implementation and its' proxy
         FraxtalERC4626MintRedeemer implementation = new FraxtalERC4626MintRedeemer();
-        Proxy proxy = new Proxy{ salt: bytes32("sFRAX1234") }(tempAdmin);
+        Proxy proxy = new Proxy{ salt: bytes32("sFRAX12345") }(tempAdmin);
 
         // Upgrade proxy to implementation and call initialize
         bytes memory data = abi.encodeCall(
@@ -102,11 +102,11 @@ contract DeploySfraxMintRedeemer is BaseScript {
         proxy.changeAdmin({ _admin: eventualAdmin });
 
         // Set the FraxtalERC4626MintRedeemer interface to the proxy (note: not needed - for testing clarity)
-        console.log("<<< Setting FraxtalERC4626MintRedeemer >>>");
+        console.log("<<< Setting FraxtalERC4626MintRedeemer [sFRAX] >>>");
         _mintRedeemer = FraxtalERC4626MintRedeemer(address(proxy));
 
-        console.log("FraxtalERC4626MintRedeemer (Proxy): ", address(proxy));
-        console.log("FraxtalERC4626MintRedeemer (Implementation): ", address(implementation));
+        console.log("FraxtalERC4626MintRedeemer [sFRAX] (Proxy): ", address(proxy));
+        console.log("FraxtalERC4626MintRedeemer [sFRAX] (Implementation): ", address(implementation));
     }
 
     function runTest(

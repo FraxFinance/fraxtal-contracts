@@ -119,8 +119,8 @@ contract Unit_Test_sFRAXRedeemer is BaseTestMisc {
         frax.mint(address(sfraxMintRedeemer), 100_000e18);
         sfrax.mint(address(sfraxMintRedeemer), 100_000e18);
 
-        // Wait a day so the oracles become stale
-        _warpToAndRollOne(block.timestamp + 86_400);
+        // Wait three days so the oracles become stale
+        _warpToAndRollOne(block.timestamp + (3 * 86_400));
 
         // Try to mint (should fail due to stale oracle)
         hoax(bob);
@@ -166,8 +166,8 @@ contract Unit_Test_sFRAXRedeemer is BaseTestMisc {
         frax.mint(address(sfraxMintRedeemer), 100_000e18);
         sfrax.mint(address(sfraxMintRedeemer), 100_000e18);
 
-        // Wait a day so the oracles become stale
-        _warpToAndRollOne(block.timestamp + 86_400);
+        // Wait three days so the oracles become stale
+        _warpToAndRollOne(block.timestamp + (3 * 86_400));
 
         // Try to deposit (should fail due to stale oracle)
         hoax(bob);
@@ -217,8 +217,8 @@ contract Unit_Test_sFRAXRedeemer is BaseTestMisc {
         frax.mint(address(sfraxMintRedeemer), 100_000e18);
         sfrax.mint(address(sfraxMintRedeemer), 100_000e18);
 
-        // Wait a day so the oracles become stale
-        _warpToAndRollOne(block.timestamp + 86_400);
+        // Wait three days so the oracles become stale
+        _warpToAndRollOne(block.timestamp + (3 * 86_400));
 
         // Try to redeem (should fail due to stale oracle)
         hoax(bob);
@@ -268,8 +268,8 @@ contract Unit_Test_sFRAXRedeemer is BaseTestMisc {
         frax.mint(address(sfraxMintRedeemer), 100_000e18);
         sfrax.mint(address(sfraxMintRedeemer), 100_000e18);
 
-        // Wait a day so the oracles become stale
-        _warpToAndRollOne(block.timestamp + 86_400);
+        // Wait three days so the oracles become stale
+        _warpToAndRollOne(block.timestamp + (3 * 86_400));
 
         // Try to redeem (should fail due to stale oracle)
         hoax(bob);
