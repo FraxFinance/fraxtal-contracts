@@ -28,7 +28,7 @@ contract FraxStakerStructs is IFraxStakerErrors, IFraxStakerEvents {
      * @param amountDelegated The amount of FRAX delegated to other stakers
      * @param amountDelegatedToStaker The amount of FRAX delegated to this staker
      * @param unlockTime The time at which the stake can be withdrawn
-     * @param numberOfDelegations The number of currently active delegations by this staker
+     * @param delegatee The delegatee address of the staker
      * @param initiatedWithdrawal True if the stake withdrawal has been initiated
      * @param __gap Reserved 10 storage slots for future upgrades
      */
@@ -37,7 +37,7 @@ contract FraxStakerStructs is IFraxStakerErrors, IFraxStakerEvents {
         uint256 amountDelegated;
         uint256 amountDelegatedToStaker;
         uint256 unlockTime;
-        uint8 numberOfDelegations;
+        address delegatee;
         bool initiatedWithdrawal;
         uint256[10] __gap; // reserve extra storage for future upgrades
     }

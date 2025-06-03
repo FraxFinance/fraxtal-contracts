@@ -244,38 +244,6 @@ contract Unit_Test_FloxCapacitor is BaseTestVeFXS, IFloxCapacitorErrors, IFloxCa
         assertEq(floxCap.balanceOf(bob), 25e18);
     }
 
-    function test_updateIncomingDelegationLimit() public {
-        floxCapSetup();
-
-        assertEq(floxCap.incomingDelegationsLimit(), 500);
-
-        vm.expectEmit(false, false, false, true);
-        emit IncomingDelegationLimitUpdated(500, 200);
-        hoax(frank);
-        floxCap.updateIncomingDelegationLimit(200);
-        assertEq(floxCap.incomingDelegationsLimit(), 200);
-
-        vm.expectRevert(NotFloxContributor.selector);
-        hoax(bob);
-        floxCap.updateIncomingDelegationLimit(200);
-    }
-
-    function test_updateMinimumDelegationBalance() public {
-        floxCapSetup();
-
-        assertEq(floxCap.minimumDelegationBalance(), 10e18);
-
-        vm.expectEmit(false, false, false, true);
-        emit MinimumDelegationBalanceUpdated(10e18, 200e18);
-        hoax(frank);
-        floxCap.updateMinimumDelegationBalance(200e18);
-        assertEq(floxCap.minimumDelegationBalance(), 200e18);
-
-        vm.expectRevert(NotFloxContributor.selector);
-        hoax(bob);
-        floxCap.updateMinimumDelegationBalance(200e18);
-    }
-
     function test_delegate() public {
         floxCapSetup();
 
@@ -288,17 +256,13 @@ contract Unit_Test_FloxCapacitor is BaseTestVeFXS, IFloxCapacitorErrors, IFloxCa
         assertEq(floxCap.balanceOf(bob), 25e18);
 
         vm.expectRevert(CannotDelegateToSelf.selector);
-        hoax(alice);
-        floxCap.delegate(alice);
-
-        vm.expectRevert(InsufficientBalanceForDelegation.selector);
-        vm.prank(address(uint160(42)));
-        floxCap.delegate(bob);
+        hoax(frank);
+        floxCap.delegate(alice, alice);
 
         vm.expectEmit(true, true, false, true);
         emit DelegationAdded(alice, bob);
-        hoax(alice);
-        floxCap.delegate(bob);
+        hoax(frank);
+        floxCap.delegate(alice, bob);
 
         assertEq(floxCap.delegations(alice), bob);
         assertEq(floxCap.incomingDelegationsCount(bob), 1);
@@ -307,13 +271,17 @@ contract Unit_Test_FloxCapacitor is BaseTestVeFXS, IFloxCapacitorErrors, IFloxCa
         assertEq(floxCap.balanceOf(bob), 75e18);
 
         vm.expectRevert(AlreadyDelegated.selector);
+        hoax(frank);
+        floxCap.delegate(alice, frank);
+
+        vm.expectRevert(NotFloxContributor.selector);
         hoax(alice);
-        floxCap.delegate(frank);
+        floxCap.delegate(alice, frank);
 
         vm.expectEmit(true, true, false, true);
         emit DelegationAdded(bob, frank);
-        hoax(bob);
-        floxCap.delegate(frank);
+        hoax(frank);
+        floxCap.delegate(bob, frank);
 
         assertEq(floxCap.delegations(alice), bob);
         assertEq(floxCap.incomingDelegationsCount(bob), 1);
@@ -324,33 +292,78 @@ contract Unit_Test_FloxCapacitor is BaseTestVeFXS, IFloxCapacitorErrors, IFloxCa
         assertEq(floxCap.incomingDelegationsCount(frank), 1);
         assertEq(floxCap.incomingDelegations(frank, 0), bob);
         assertEq(floxCap.balanceOf(frank), 25e18);
+    }
 
-        hoax(frank);
-        fraxStaker.stakeFrax{ value: 100e18 }();
+    function test_bulkDelegate() public {
+        floxCapSetup();
 
-        hoax(frank);
-        floxCap.updateIncomingDelegationLimit(1);
+        hoax(alice);
+        fraxStaker.stakeFrax{ value: 50e18 }();
+        hoax(bob);
+        fraxStaker.stakeFrax{ value: 25e18 }();
+        hoax(claire);
+        fraxStaker.stakeFrax{ value: 10e18 }();
+        hoax(dave);
+        fraxStaker.stakeFrax{ value: 15e18 }();
 
-        vm.expectRevert(TooManyIncomingDelegations.selector);
-        hoax(frank);
-        floxCap.delegate(bob);
+        assertEq(floxCap.balanceOf(alice), 50e18);
+        assertEq(floxCap.balanceOf(bob), 25e18);
+        assertEq(floxCap.balanceOf(claire), 10e18);
+        assertEq(floxCap.balanceOf(dave), 15e18);
 
+        address[] memory delegators = new address[](3);
+        delegators[0] = alice;
+        delegators[1] = claire;
+        delegators[2] = bob;
+
+        address[] memory delegatees = new address[](3);
+        delegatees[0] = bob;
+        delegatees[1] = dave;
+        delegatees[2] = dave;
+
+        vm.expectEmit(true, true, false, true);
+        emit DelegationAdded(alice, bob);
+        vm.expectEmit(true, true, false, true);
+        emit DelegationAdded(claire, dave);
+        vm.expectEmit(true, true, false, true);
+        emit DelegationAdded(bob, dave);
         hoax(frank);
-        floxCap.rejectDelegation(bob);
+        floxCap.bulkDelegate(delegators, delegatees);
 
         assertEq(floxCap.delegations(alice), bob);
         assertEq(floxCap.incomingDelegationsCount(bob), 1);
         assertEq(floxCap.incomingDelegations(bob, 0), alice);
         assertEq(floxCap.balanceOf(alice), 0);
-        assertEq(floxCap.balanceOf(bob), 75e18);
-        assertEq(floxCap.delegations(bob), address(0));
-        assertEq(floxCap.incomingDelegationsCount(frank), 0);
-        assertEq(floxCap.incomingDelegations(frank, 0), address(0));
-        assertEq(floxCap.balanceOf(frank), 100e18);
+        assertEq(floxCap.balanceOf(bob), 50e18);
 
-        vm.expectRevert(BlacklistedDelegator.selector);
-        hoax(bob);
-        floxCap.delegate(frank);
+        assertEq(floxCap.delegations(claire), dave);
+        assertEq(floxCap.incomingDelegationsCount(dave), 2);
+        assertEq(floxCap.incomingDelegations(dave, 0), claire);
+        assertEq(floxCap.balanceOf(claire), 0);
+        assertEq(floxCap.balanceOf(dave), 50e18);
+
+        assertEq(floxCap.delegations(bob), dave);
+        assertEq(floxCap.incomingDelegationsCount(dave), 2);
+        assertEq(floxCap.incomingDelegations(dave, 1), bob);
+        assertEq(floxCap.balanceOf(bob), 50e18);
+        assertEq(floxCap.balanceOf(dave), 50e18);
+
+        vm.expectRevert(NotFloxContributor.selector);
+        hoax(alice);
+        floxCap.bulkDelegate(delegators, delegatees);
+
+        vm.expectRevert(ArrayLengthMismatch.selector);
+        hoax(frank);
+        floxCap.bulkDelegate(delegators, new address[](2));
+
+        vm.expectRevert(AlreadyDelegated.selector);
+        hoax(frank);
+        floxCap.bulkDelegate(delegators, delegatees);
+
+        delegators[0] = bob;
+        vm.expectRevert(CannotDelegateToSelf.selector);
+        hoax(frank);
+        floxCap.bulkDelegate(delegators, delegatees);
     }
 
     function test_revokeDelegation() public {
@@ -364,116 +377,126 @@ contract Unit_Test_FloxCapacitor is BaseTestVeFXS, IFloxCapacitorErrors, IFloxCa
         assertEq(floxCap.balanceOf(alice), 50e18);
         assertEq(floxCap.balanceOf(bob), 25e18);
 
-        hoax(alice);
-        floxCap.delegate(bob);
+        hoax(frank);
+        floxCap.delegate(alice, bob);
+        hoax(frank);
+        floxCap.delegate(claire, bob);
+        hoax(frank);
+        floxCap.delegate(frank, bob);
 
         assertEq(floxCap.delegations(alice), bob);
-        assertEq(floxCap.incomingDelegationsCount(bob), 1);
+        assertEq(floxCap.incomingDelegationsCount(bob), 3);
         assertEq(floxCap.incomingDelegations(bob, 0), alice);
         assertEq(floxCap.balanceOf(alice), 0);
         assertEq(floxCap.balanceOf(bob), 75e18);
 
         vm.expectRevert(NoActiveDelegations.selector);
+        hoax(frank);
+        floxCap.revokeDelegation(bob);
+
+        vm.expectRevert(NotFloxContributor.selector);
         hoax(bob);
-        floxCap.revokeDelegation();
+        floxCap.revokeDelegation(bob);
 
         vm.expectEmit(true, true, false, true);
         emit DelegationRemoved(alice, bob);
-        hoax(alice);
-        floxCap.revokeDelegation();
+        hoax(frank);
+        floxCap.revokeDelegation(alice);
 
         assertEq(floxCap.delegations(alice), address(0));
-        assertEq(floxCap.incomingDelegationsCount(bob), 0);
-        assertEq(floxCap.incomingDelegations(bob, 0), address(0));
+        assertEq(floxCap.incomingDelegationsCount(bob), 2);
+        assertEq(floxCap.incomingDelegations(bob, 0), frank);
         assertEq(floxCap.balanceOf(alice), 50e18);
         assertEq(floxCap.balanceOf(bob), 25e18);
     }
 
-    function test_rejectDelegation() public {
+    function test_bulkRevokeDelegation() public {
         floxCapSetup();
 
         hoax(alice);
         fraxStaker.stakeFrax{ value: 50e18 }();
         hoax(bob);
         fraxStaker.stakeFrax{ value: 25e18 }();
+        hoax(claire);
+        fraxStaker.stakeFrax{ value: 10e18 }();
+        hoax(dave);
+        fraxStaker.stakeFrax{ value: 15e18 }();
 
         assertEq(floxCap.balanceOf(alice), 50e18);
         assertEq(floxCap.balanceOf(bob), 25e18);
+        assertEq(floxCap.balanceOf(claire), 10e18);
+        assertEq(floxCap.balanceOf(dave), 15e18);
 
-        hoax(alice);
-        floxCap.delegate(bob);
+        address[] memory delegators = new address[](3);
+        delegators[0] = alice;
+        delegators[1] = claire;
+        delegators[2] = bob;
+
+        address[] memory delegatees = new address[](3);
+        delegatees[0] = bob;
+        delegatees[1] = dave;
+        delegatees[2] = dave;
+
+        vm.expectEmit(true, true, false, true);
+        emit DelegationAdded(alice, bob);
+        vm.expectEmit(true, true, false, true);
+        emit DelegationAdded(claire, dave);
+        vm.expectEmit(true, true, false, true);
+        emit DelegationAdded(bob, dave);
+        hoax(frank);
+        floxCap.bulkDelegate(delegators, delegatees);
 
         assertEq(floxCap.delegations(alice), bob);
         assertEq(floxCap.incomingDelegationsCount(bob), 1);
         assertEq(floxCap.incomingDelegations(bob, 0), alice);
         assertEq(floxCap.balanceOf(alice), 0);
-        assertEq(floxCap.balanceOf(bob), 75e18);
-        assertFalse(floxCap.balcklistedDelegators(bob, alice));
+        assertEq(floxCap.balanceOf(bob), 50e18);
 
-        vm.expectRevert(DelegationMismatch.selector);
+        assertEq(floxCap.delegations(claire), dave);
+        assertEq(floxCap.incomingDelegationsCount(dave), 2);
+        assertEq(floxCap.incomingDelegations(dave, 0), claire);
+        assertEq(floxCap.balanceOf(claire), 0);
+        assertEq(floxCap.balanceOf(dave), 50e18);
+
+        assertEq(floxCap.delegations(bob), dave);
+        assertEq(floxCap.incomingDelegationsCount(dave), 2);
+        assertEq(floxCap.incomingDelegations(dave, 1), bob);
+        assertEq(floxCap.balanceOf(bob), 50e18);
+        assertEq(floxCap.balanceOf(dave), 50e18);
+
+        vm.expectRevert(NotFloxContributor.selector);
         hoax(alice);
-        floxCap.rejectDelegation(bob);
+        floxCap.bulkRevokeDelegation(delegators);
 
         vm.expectEmit(true, true, false, true);
         emit DelegationRemoved(alice, bob);
         vm.expectEmit(true, true, false, true);
-        emit BlacklistDelegationStatusUpdated(bob, alice, true);
-        hoax(bob);
-        floxCap.rejectDelegation(alice);
-
-        assertEq(floxCap.delegations(alice), address(0));
-        assertEq(floxCap.incomingDelegationsCount(bob), 0);
-        assertEq(floxCap.incomingDelegations(bob, 0), address(0));
-        assertEq(floxCap.balanceOf(alice), 50e18);
-        assertEq(floxCap.balanceOf(bob), 25e18);
-        assertTrue(floxCap.balcklistedDelegators(bob, alice));
-    }
-
-    function test_removeDelegatorFromBlacklist() public {
-        floxCapSetup();
-
-        hoax(alice);
-        fraxStaker.stakeFrax{ value: 50e18 }();
-        hoax(bob);
-        fraxStaker.stakeFrax{ value: 25e18 }();
-
-        assertEq(floxCap.balanceOf(alice), 50e18);
-        assertEq(floxCap.balanceOf(bob), 25e18);
-
-        hoax(alice);
-        floxCap.delegate(bob);
-
-        assertEq(floxCap.delegations(alice), bob);
-        assertEq(floxCap.incomingDelegationsCount(bob), 1);
-        assertEq(floxCap.incomingDelegations(bob, 0), alice);
-        assertEq(floxCap.balanceOf(alice), 0);
-        assertEq(floxCap.balanceOf(bob), 75e18);
-        assertFalse(floxCap.balcklistedDelegators(bob, alice));
-
-        vm.expectRevert(NotBlacklistedDelegator.selector);
-        hoax(alice);
-        floxCap.removeDelegatorFromBlacklist(bob);
-
-        hoax(bob);
-        floxCap.rejectDelegation(alice);
-
-        assertEq(floxCap.delegations(alice), address(0));
-        assertEq(floxCap.incomingDelegationsCount(bob), 0);
-        assertEq(floxCap.incomingDelegations(bob, 0), address(0));
-        assertEq(floxCap.balanceOf(alice), 50e18);
-        assertEq(floxCap.balanceOf(bob), 25e18);
-        assertTrue(floxCap.balcklistedDelegators(bob, alice));
-
+        emit DelegationRemoved(claire, dave);
         vm.expectEmit(true, true, false, true);
-        emit BlacklistDelegationStatusUpdated(bob, alice, false);
-        hoax(bob);
-        floxCap.removeDelegatorFromBlacklist(alice);
+        emit DelegationRemoved(bob, dave);
+        hoax(frank);
+        floxCap.bulkRevokeDelegation(delegators);
 
         assertEq(floxCap.delegations(alice), address(0));
         assertEq(floxCap.incomingDelegationsCount(bob), 0);
         assertEq(floxCap.incomingDelegations(bob, 0), address(0));
         assertEq(floxCap.balanceOf(alice), 50e18);
         assertEq(floxCap.balanceOf(bob), 25e18);
-        assertFalse(floxCap.balcklistedDelegators(bob, alice));
+
+        assertEq(floxCap.delegations(claire), address(0));
+        assertEq(floxCap.incomingDelegationsCount(dave), 0);
+        assertEq(floxCap.incomingDelegations(dave, 0), address(0));
+        assertEq(floxCap.balanceOf(claire), 10e18);
+        assertEq(floxCap.balanceOf(dave), 15e18);
+
+        assertEq(floxCap.delegations(bob), address(0));
+        assertEq(floxCap.incomingDelegationsCount(dave), 0);
+        assertEq(floxCap.incomingDelegations(dave, 1), address(0));
+        assertEq(floxCap.balanceOf(bob), 25e18);
+        assertEq(floxCap.balanceOf(dave), 15e18);
+
+        vm.expectRevert(NoActiveDelegations.selector);
+        hoax(frank);
+        floxCap.bulkRevokeDelegation(delegators);
     }
 }

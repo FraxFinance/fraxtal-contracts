@@ -39,14 +39,6 @@ contract FloxCapacitor is OwnedUpgradeable, IFloxCapacitorErrors, IFloxCapacitor
      */
     mapping(address contributor => bool isContributor) public isFloxContributor;
     /**
-     * @notice Used to track the blacklisted delegatees.
-     * @dev This mapping is used to keep track of the delegatees from whom the user refuses to accept delegation.
-     * @dev user Address of the user that refuses to accept delegation from the specified delegateee.
-     * @dev delegator Address of the user prohibited from delegating to the user.
-     * @dev isBlacklisted True if the address is blacklisted.
-     */
-    mapping(address user => mapping(address delegator => bool isBlacklisted)) public balcklistedDelegators;
-    /**
      * @notice Used to track the Flox Capacitor delegations.
      * @dev user Address of the user delegating their balance.
      * @dev delegatee Address of the user receiving the delegation.
@@ -68,12 +60,6 @@ contract FloxCapacitor is OwnedUpgradeable, IFloxCapacitorErrors, IFloxCapacitor
 
     /// Version of the FloxCAP smart contract.
     string public version;
-    /// Minumum balance needed in order to be able to delegate.
-    /// @dev This is used to safeguard against empty delegations.
-    uint256 public minimumDelegationBalance;
-    /// Number of allowed incoming delegations per delegatee.
-    /// @dev This needs to be enforced, so the user can't be DDoSed by empty delegations attack.
-    uint16 public incomingDelegationsLimit;
     /// The divisor used to convert the veFRAX balance to FloxCAP balance.
     uint8 public veFraxDivisor;
     /// Variable to track if the contract is paused.
@@ -107,8 +93,6 @@ contract FloxCapacitor is OwnedUpgradeable, IFloxCapacitorErrors, IFloxCapacitor
         _initialized = true;
         fraxStaker = FraxStaker(_fraxStaker);
         veFRAX = VeFXSAggregator(_veFraxAggregator);
-        minimumDelegationBalance = 10e18; // 10 FRAX
-        incomingDelegationsLimit = 500;
         veFraxDivisor = _veFraxDivisor;
         version = _version;
 
@@ -184,33 +168,6 @@ contract FloxCapacitor is OwnedUpgradeable, IFloxCapacitorErrors, IFloxCapacitor
     }
 
     /**
-     * @notice Used to update the incoming delegation limit.
-     * @param _incomingDelegationsLimit The new incoming delegation limit
-     */
-    function updateIncomingDelegationLimit(uint16 _incomingDelegationsLimit) external {
-        _onlyFloxContributor();
-
-        uint16 oldIncomingDelegationLimit = incomingDelegationsLimit;
-        incomingDelegationsLimit = _incomingDelegationsLimit;
-
-        emit IncomingDelegationLimitUpdated(oldIncomingDelegationLimit, incomingDelegationsLimit);
-    }
-
-    /**
-     * @notice Used to update the minimum balance needed to delegate.
-     * @dev Can only be called by a Flox contributor.
-     * @param _minimumDelegationBalance The new minimum delegation balance
-     */
-    function updateMinimumDelegationBalance(uint256 _minimumDelegationBalance) external {
-        _onlyFloxContributor();
-
-        uint256 oldMinimumDelegationBalance = minimumDelegationBalance;
-        minimumDelegationBalance = _minimumDelegationBalance;
-
-        emit MinimumDelegationBalanceUpdated(oldMinimumDelegationBalance, minimumDelegationBalance);
-    }
-
-    /**
      * @notice Used to enable the use of veFRAX balances to calculate the total user boost.
      * @dev Can only be called by a Flox contributor.
      * @dev The operation will be reverted if the contract is already using veFRAX balances.
@@ -270,80 +227,111 @@ contract FloxCapacitor is OwnedUpgradeable, IFloxCapacitorErrors, IFloxCapacitor
 
     /**
      * @notice Used to delegate the caller's balance to the specified delegatee.
-     * @dev The caller cannot delegate to themselves.
-     * @dev If the delegatee already has the maximum number of incoming delegations, the operation will be reverted.
-     * @dev The caller cannot delegate if they already have an active delegation.
-     * @dev The caller must have a balance greater than the minimum delegation balance.
+     * @dev Can only be called by a Flox contributor.
+     * @dev The delegator cannot delegate to themselves.
+     * @dev The delegator cannot delegate if they already have an active delegation.
+     * @param _delegator The address of the user delegating their balance
      * @param _delegatee The address of the user receiving the delegation
      */
-    function delegate(address _delegatee) external {
-        if (msg.sender == _delegatee) revert CannotDelegateToSelf();
-        if (balcklistedDelegators[_delegatee][msg.sender]) revert BlacklistedDelegator();
-        if (incomingDelegationsCount[_delegatee] >= incomingDelegationsLimit) revert TooManyIncomingDelegations();
-        if (delegations[msg.sender] != address(0)) revert AlreadyDelegated();
+    function delegate(address _delegator, address _delegatee) external {
+        _onlyFloxContributor();
 
-        if (_balanceOf(msg.sender) < minimumDelegationBalance) revert InsufficientBalanceForDelegation();
+        if (_delegator == _delegatee) revert CannotDelegateToSelf();
+        if (delegations[_delegator] != address(0)) revert AlreadyDelegated();
 
-        delegations[msg.sender] = _delegatee;
-        incomingDelegations[_delegatee][incomingDelegationsCount[_delegatee]] = msg.sender;
+        delegations[_delegator] = _delegatee;
+        incomingDelegations[_delegatee][incomingDelegationsCount[_delegatee]] = _delegator;
         incomingDelegationsCount[_delegatee] = incomingDelegationsCount[_delegatee] + 1;
 
-        emit DelegationAdded(msg.sender, _delegatee);
+        emit DelegationAdded(_delegator, _delegatee);
+    }
+
+    /**
+     * @notice Used to assing multiple delegations in a single transaction.
+     * @dev Can only be called by a Flox contributor.
+     * @dev The delegators and delegatees arrays must have the same length.
+     * @dev The delegator cannot delegate to themselves.
+     * @dev The delegator cannot delegate if they already have an active delegation.
+     * @dev The delegations will be assigned in the order they are provided in the arrays.
+     * @param _delegators An array of addresses delegating their balances
+     * @param _delegatees An array of addresses receiving the delegations
+     */
+    function bulkDelegate(address[] memory _delegators, address[] memory _delegatees) external {
+        _onlyFloxContributor();
+
+        if (_delegators.length != _delegatees.length) revert ArrayLengthMismatch();
+
+        for (uint256 i; i < _delegators.length; ) {
+            address delegator = _delegators[i];
+            address delegatee = _delegatees[i];
+
+            if (delegator == delegatee) revert CannotDelegateToSelf();
+            if (delegations[delegator] != address(0)) revert AlreadyDelegated();
+
+            delegations[delegator] = delegatee;
+            incomingDelegations[delegatee][incomingDelegationsCount[delegatee]] = delegator;
+            incomingDelegationsCount[delegatee] = incomingDelegationsCount[delegatee] + 1;
+
+            emit DelegationAdded(delegator, delegatee);
+
+            unchecked {
+                ++i;
+            }
+        }
     }
 
     /**
      * @notice Used to revoke the caller's delegation.
-     * @dev The caller must have an active delegation.
+     * @dev Can only be called by a Flox contributor.
+     * @dev The delegator must have an active delegation.
+     * @param _delegator The address of the user delegating their balance
      */
-    function revokeDelegation() external {
-        address delegatee = delegations[msg.sender];
+    function revokeDelegation(address _delegator) external {
+        _onlyFloxContributor();
+
+        address delegatee = delegations[_delegator];
         if (delegatee == address(0)) revert NoActiveDelegations();
 
-        uint256 index = _findDelegatorIndex(msg.sender);
+        uint256 index = _findDelegatorIndex(_delegator);
 
         incomingDelegationsCount[delegatee]--;
         incomingDelegations[delegatee][index] = incomingDelegations[delegatee][incomingDelegationsCount[delegatee]];
         incomingDelegations[delegatee][incomingDelegationsCount[delegatee]] = address(0);
 
-        delegations[msg.sender] = address(0);
-
-        emit DelegationRemoved(msg.sender, delegatee);
-    }
-
-    /**
-     * @notice Used to reject a delegation from the specified delegator.
-     * @dev The caller must be the delegatee of the delegator.
-     * @dev This also blacklists the delegator from delegating to the caller in the future.
-     * @param _delegator The address of the user delegating their balance
-     */
-    function rejectDelegation(address _delegator) external {
-        if (msg.sender != delegations[_delegator]) revert DelegationMismatch();
-
-        uint256 index = _findDelegatorIndex(_delegator);
-
-        incomingDelegationsCount[msg.sender]--;
-        incomingDelegations[msg.sender][index] = incomingDelegations[msg.sender][incomingDelegationsCount[msg.sender]];
-        incomingDelegations[msg.sender][incomingDelegationsCount[msg.sender]] = address(0);
-
         delegations[_delegator] = address(0);
 
-        balcklistedDelegators[msg.sender][_delegator] = true;
-
-        emit DelegationRemoved(_delegator, msg.sender);
-        emit BlacklistDelegationStatusUpdated(msg.sender, _delegator, true);
+        emit DelegationRemoved(_delegator, delegatee);
     }
 
     /**
-     * @notice Used to remove a delegator from the blacklist.
-     * @dev The delegator must be blacklisted by the caller, otherwise the operation will be reverted.
-     * @param _delegator The address of the delegator to be removed from the blacklist
+     * @notice Used to revoke multiple delegations in a single transaction.
+     * @dev Can only be called by a Flox contributor.
+     * @dev The delegator must have an active delegation.
+     * @param _delegators An array of addresses delegating their balances
      */
-    function removeDelegatorFromBlacklist(address _delegator) external {
-        if (!balcklistedDelegators[msg.sender][_delegator]) revert NotBlacklistedDelegator();
+    function bulkRevokeDelegation(address[] memory _delegators) external {
+        _onlyFloxContributor();
 
-        balcklistedDelegators[msg.sender][_delegator] = false;
+        for (uint256 i; i < _delegators.length; ) {
+            address delegator = _delegators[i];
+            address delegatee = delegations[delegator];
 
-        emit BlacklistDelegationStatusUpdated(msg.sender, _delegator, false);
+            if (delegatee == address(0)) revert NoActiveDelegations();
+
+            uint256 index = _findDelegatorIndex(delegator);
+
+            incomingDelegationsCount[delegatee]--;
+            incomingDelegations[delegatee][index] = incomingDelegations[delegatee][incomingDelegationsCount[delegatee]];
+            incomingDelegations[delegatee][incomingDelegationsCount[delegatee]] = address(0);
+
+            delegations[delegator] = address(0);
+
+            emit DelegationRemoved(delegator, delegatee);
+
+            unchecked {
+                ++i;
+            }
+        }
     }
 
     /**

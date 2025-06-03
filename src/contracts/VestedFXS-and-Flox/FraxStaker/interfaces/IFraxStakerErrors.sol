@@ -21,6 +21,9 @@ interface IFraxStakerErrors {
     /// Emitted when the staker is already blacklisted.
     error AlreadyBlacklistedStaker();
 
+    /// Emitted when attempting to telegate to someone when you already have an active delegation.
+    error AlreadyDelegatedToAnotherDelegatee();
+
     /// Emitted when the owner tries to add a Frax contributor that is already a Frax contributor.
     error AlreadyFraxContributor();
 
@@ -56,6 +59,9 @@ interface IFraxStakerErrors {
 
     /// Emitted when attempting to create a stake with a zero amount.
     error InvalidStakeAmount();
+
+    /// Emitted when the staker tries to delegate their stake when they already have an active non-delegated stake.
+    error NonDelegatedStakeAlreadyExists();
 
     /// Emitted when there is no proposed slashing recipient.
     error NoProposedSlashingRecipient();

@@ -44,13 +44,6 @@ contract FraxStaker is OwnedUpgradeable, FraxStakerStructs {
      */
     mapping(address staker => bool isBlacklisted) public blacklist;
     /**
-     * @notice Used to track the delegations of the users.
-     * @dev staker Address of the staker.
-     * @dev delegatee Address of the delegatee.
-     * @dev amount Amount of FRAX delegated.
-     */
-    mapping(address staker => mapping(address delegatee => uint256 amount)) public delegations;
-    /**
      * @notice Used to keep track of the frozen stakers.
      * @dev address Address of the staker.
      * @dev isFrozen Whether the staker's stake is frozen or not.
@@ -75,14 +68,6 @@ contract FraxStaker is OwnedUpgradeable, FraxStakerStructs {
      * @dev stake Stake of the user.
      */
     mapping(address staker => Stake stake) public stakes;
-    /**
-     * @notice Used to track the staker's active delegatees.
-     * @dev This mapping is used to bypass the need to index events in order to determine all of the staker's delegatees.
-     * @dev staker Address of the staker.
-     * @dev delegateeIndex Index of the delegatee.
-     * @dev delegatee Address of the delegatee.
-     */
-    mapping(address staker => mapping(uint8 delegateeIndex => address delegatee)) public stakerDelegatees;
 
     /// The cooldown required before a staker can withdraw their stake.
     uint256 public withdrawalCooldown;
@@ -149,12 +134,51 @@ contract FraxStaker is OwnedUpgradeable, FraxStakerStructs {
      * @dev The operation will be reverted if the staker's stake is frozen.
      * @dev The operation will be reverted if the staker is blacklisted.
      * @dev The amount of FRAX to stake is the value sent with the transaction.
+     * @dev If the staker delegates their stake, this will increase the delegated stake instead of creating a separate
+     *  stake for them.
      */
     function stakeFrax() external payable {
         _onlyWhenOperational();
         _onlyWhenNotFrozen(msg.sender);
         _onlyWhenNotBlacklisted(msg.sender);
+
         _stake(msg.value, msg.sender);
+
+        Stake memory stake = stakes[msg.sender];
+        if (stake.delegatee != address(0)) {
+            _onlyWhenNotFrozen(stake.delegatee);
+            _onlyWhenNotBlacklisted(stake.delegatee);
+
+            _delegate(msg.sender, stake.delegatee, msg.value);
+        }
+    }
+
+    /**
+     * @notice Stakes FRAX for the caller.
+     * @dev The operation will be reverted if the contract is paused.
+     * @dev The operation will be reverted if the staker's stake is frozen.
+     * @dev The operation will be reverted if the delegatee's stake is frozen.
+     * @dev The operation will be reverted if the staker is blacklisted.
+     * @dev The operation will be reverted if the delegatee is blacklisted.
+     * @dev The amount of FRAX to stake is the value sent with the transaction.
+     * @dev This overloaded function allows the staker to delegate their stake to antoher staker.
+     * @dev If another delegation exists for the staker, this function will revert.
+     * @param _delegatee Address of the delegatee
+     */
+    function stakeFrax(address _delegatee) external payable {
+        _onlyWhenOperational();
+        _onlyWhenNotFrozen(msg.sender);
+        _onlyWhenNotFrozen(_delegatee);
+        _onlyWhenNotBlacklisted(msg.sender);
+        _onlyWhenNotBlacklisted(_delegatee);
+
+        // Make sure that the staker doesn't have a non-delegated stake
+        if (stakes[msg.sender].amountStaked != stakes[msg.sender].amountDelegated) {
+            revert NonDelegatedStakeAlreadyExists();
+        }
+
+        _stake(msg.value, msg.sender);
+        _delegate(msg.sender, _delegatee, msg.value);
     }
 
     /**
@@ -162,13 +186,12 @@ contract FraxStaker is OwnedUpgradeable, FraxStakerStructs {
      * @dev The operation will be reverted if the contract is paused.
      * @dev The operation will be reverted if the staker's stake is frozen.
      * @dev The operation will be reverted if the staker is blacklisted.
-     * @dev This operation will revoke all delegations of the staker's stake.
      */
     function initiateWithdrawal() external {
         _onlyWhenOperational();
         _onlyWhenNotFrozen(msg.sender);
         _onlyWhenNotBlacklisted(msg.sender);
-        _revokeAllDelegations(msg.sender);
+
         _initiateWithdrawal(msg.sender);
     }
 
@@ -176,62 +199,32 @@ contract FraxStaker is OwnedUpgradeable, FraxStakerStructs {
      * @notice Withdraws the staker's stake.
      * @dev The operation will be reverted if the contract is paused.
      * @dev The operation will be reverted if the staker's stake is frozen.
+     * @dev This operation will revoke all delegations of the staker's stake. This is only done in this stepto ensure
+     *  the delegations can't be instantly revoked.
      * @dev Blacklisted stakers can withdraw their remaining stake.
      */
     function withdrawStake() external {
         _onlyWhenOperational();
         _onlyWhenNotFrozen(msg.sender);
+
+        _revokeDelegation(msg.sender);
         _withdrawStake(msg.sender);
     }
 
     /**
-     * @notice Delegates a part of the staker's stake to another staker.
-     * @dev The operation will be reverted if the contract is paused.
+     * @notice Allows Frax contibutor to force the withdrawal of staker's stake.
+     * @dev This can only be called by a Frax contributor and is used to prevent the abiltiy to instantly withdraw
+     *  delegated stakes.
      * @dev The operation will be reverted if the staker's stake is frozen.
-     * @dev The operation will be reverted if the delegatee's stake is frozen.
-     * @dev The operation will be reverted if the staker is blacklisted.
-     * @dev The operation will be reverted if the delegateee is blacklisted.
-     * @param _delegatee Address of the delegatee
-     * @param _amount Amount of FRAX to delegate
+     * @dev This revokes the full amount of the delegated stake.
+     * @param _staker Address of the staker to force withdraw
      */
-    function delegateStake(address _delegatee, uint256 _amount) external {
-        _onlyWhenOperational();
-        _onlyWhenNotFrozen(msg.sender);
-        _onlyWhenNotFrozen(_delegatee);
-        _onlyWhenNotBlacklisted(msg.sender);
-        _onlyWhenNotBlacklisted(_delegatee);
+    function forceStakeWithdrawal(address _staker) external {
+        _onlyFraxContributor();
+        _onlyWhenNotFrozen(_staker);
 
-        _delegate(msg.sender, _delegatee, _amount);
-    }
-
-    /**
-     * @notice Revokes the full amount of the delegation of the staker's stake to another staker.
-     * @dev The operation will be reverted if the contract is paused.
-     * @dev The operation will be reverted if the staker's stake is frozen.
-     * @dev The operation will be reverted if the staker is blacklisted.
-     * @dev Users should be able to revoke delegations to frozen or blacklisted stakers.
-     * @param _delegatee Address of the delegatee
-     */
-    function revokeDelegation(address _delegatee) external {
-        _onlyWhenOperational();
-        _onlyWhenNotFrozen(msg.sender);
-        _onlyWhenNotBlacklisted(msg.sender);
-
-        _revokeDelegation(msg.sender, _delegatee);
-    }
-
-    /**
-     * @notice Revokes all delegations of the staker's stake to other stakers.
-     * @dev The operation will be reverted if the contract is paused.
-     * @dev The operation will be reverted if the staker's stake is frozen.
-     * @dev The operation will be reverted if the staker is blacklisted.
-     */
-    function revokeAllDelegations() external {
-        _onlyWhenOperational();
-        _onlyWhenNotFrozen(msg.sender);
-        _onlyWhenNotBlacklisted(msg.sender);
-
-        _revokeAllDelegations(msg.sender);
+        _revokeDelegation(_staker);
+        _withdrawStake(_staker);
     }
 
     /**
@@ -483,6 +476,9 @@ contract FraxStaker is OwnedUpgradeable, FraxStakerStructs {
         stake.initiatedWithdrawal = true;
         stake.unlockTime = block.timestamp + withdrawalCooldown;
 
+        if (stake.delegatee != address(0)) {
+            emit DelegationRevocationInitiated(_staker, stake.delegatee, stake.amountStaked, stake.unlockTime);
+        }
         emit StakeWithdrawalInitiated(_staker, stake.amountStaked, stake.unlockTime);
     }
 
@@ -512,7 +508,7 @@ contract FraxStaker is OwnedUpgradeable, FraxStakerStructs {
     /**
      * @notice Delegates a part of the staker's stake to another staker.
      * @dev The operation will be reverted if the staker wants to delegate more FRAX than available.
-     * @dev The operation will be reverted if the staker has already delegated to the maximum number of delegatees.
+     * @dev The operation will be reverted if the staker has already delegated to amother delegatee.
      * @param _staker Address of the staker
      * @param _delegatee Address of the delegatee
      * @param _amount Amount of FRAX to delegate
@@ -524,93 +520,37 @@ contract FraxStaker is OwnedUpgradeable, FraxStakerStructs {
 
         if (_amount > stakerStake.amountStaked - stakerStake.amountDelegated) revert InvalidStakeAmount();
 
-        bool alreadyStakersDelegatee;
-        if (delegations[_staker][_delegatee] != 0) {
-            alreadyStakersDelegatee = true;
-        }
+        if (stakerStake.delegatee != address(0) && stakerStake.delegatee != _delegatee)
+            revert AlreadyDelegatedToAnotherDelegatee();
 
-        if (!alreadyStakersDelegatee) {
-            if (stakerStake.numberOfDelegations == 255) revert TooManyDelegations();
-            stakerDelegatees[_staker][stakerStake.numberOfDelegations] = _delegatee;
-            ++stakerStake.numberOfDelegations;
-        }
-
-        delegations[_staker][_delegatee] += _amount;
         stakerStake.amountDelegated += _amount;
+        stakerStake.delegatee = _delegatee;
         stakes[_delegatee].amountDelegatedToStaker += _amount;
 
         emit StakeDelegated(_staker, _delegatee, _amount);
     }
 
     /**
-     * @notice Revokes the full amount of the delegation of the staker's stake to another staker.
-     * @dev The operation will be reverted if the staker has not delegated any stake to the delegatee.
-     * @dev This revokes the full amount of the delegated stake to the delegatee.
-     * @param _staker Address of the staker
-     * @param _delegatee Address of the delegatee
-     */
-    function _revokeDelegation(address _staker, address _delegatee) internal {
-        Stake storage stakerStake = stakes[_staker];
-
-        uint256 amount = delegations[_staker][_delegatee];
-        if (amount == 0) revert InvalidStakeAmount();
-
-        for (uint8 i; i < stakerStake.numberOfDelegations; ) {
-            if (stakerDelegatees[_staker][i] == _delegatee) {
-                // This shifts the last delegatee to the slot of the one we are removing
-                stakerDelegatees[_staker][i] = stakerDelegatees[_staker][stakerStake.numberOfDelegations - 1];
-                // This removes the entry that was shifted to the spot of the delegatee we are removing
-                stakerDelegatees[_staker][stakerStake.numberOfDelegations - 1] = address(0);
-
-                --stakerStake.numberOfDelegations;
-                break;
-            }
-
-            unchecked {
-                ++i;
-            }
-        }
-
-        delegations[_staker][_delegatee] = 0;
-        stakerStake.amountDelegated -= amount;
-        stakes[_delegatee].amountDelegatedToStaker -= amount;
-
-        emit StakeDelegationRevoked(_staker, _delegatee, amount);
-    }
-
-    /**
-     * @notice Revokes all delegations of the staker's stake to other stakers.
-     * @dev The operation will be reverted if the staker has not delegated any stake to any delegatee.
-     * @dev This revokes the full amount of the delegated stake to all delegatees.
-     * @dev This will also remove the staker from the delegatee's list of stakers.
+     * @notice Revokes staker's delegation.
+     * @dev The operation will be reverted if the staker has not delegated their stake to anyone.
+     * @dev This revokes the full amount of the delegated stake.
      * @param _staker Address of the staker
      */
-    function _revokeAllDelegations(address _staker) internal {
+    function _revokeDelegation(address _staker) internal {
         Stake storage stake = stakes[_staker];
-        uint256 totalAmountRevoked;
 
-        for (uint8 i = stakes[_staker].numberOfDelegations; i > 0; ) {
-            address delegatee = stakerDelegatees[_staker][i - 1];
+        address delegatee = stake.delegatee;
 
-            uint256 amount = delegations[_staker][delegatee];
+        uint256 amount = stake.amountDelegated;
 
-            delegations[_staker][delegatee] = 0;
+        if (amount > 0) {
+            stake.amountDelegated = 0;
             stakes[delegatee].amountDelegatedToStaker -= amount;
 
-            stakerDelegatees[_staker][i - 1] = address(0);
-
-            totalAmountRevoked += amount;
+            stake.delegatee = address(0);
 
             emit StakeDelegationRevoked(_staker, delegatee, amount);
-
-            unchecked {
-                --i;
-            }
         }
-
-        if (stake.amountDelegated != totalAmountRevoked) revert UnableToRevokeAllDelegations();
-        stake.amountDelegated -= totalAmountRevoked;
-        stake.numberOfDelegations = 0;
     }
 
     /**
@@ -626,6 +566,11 @@ contract FraxStaker is OwnedUpgradeable, FraxStakerStructs {
 
         stake.amountStaked -= _amount;
 
+        if (stake.delegatee != address(0)) {
+            stakes[stake.delegatee].amountDelegatedToStaker -= _amount;
+            stake.amountDelegated -= _amount;
+        }
+
         (bool success, ) = SLASHING_RECIPIENT.call{ value: _amount }("");
         if (!success) revert TransferFailed();
 
@@ -636,6 +581,7 @@ contract FraxStaker is OwnedUpgradeable, FraxStakerStructs {
      * @notice Freezes the staker's stake.
      * @dev This is reversible and should be used when investigating a staker.
      * @dev The operation will be reverted if the staker's stake is already frozen.
+     * @dev IF the staker delegated their stake, freezing their stake will temporarily remove the delegated stake.
      * @param _staker Address of the staker to freeze
      */
     function _freezeStaker(address _staker) internal {
@@ -643,6 +589,10 @@ contract FraxStaker is OwnedUpgradeable, FraxStakerStructs {
         if (stakes[_staker].amountStaked == 0) revert InvalidStakeAmount();
 
         isFrozenStaker[_staker] = true;
+
+        if (stakes[_staker].delegatee != address(0)) {
+            stakes[stakes[_staker].delegatee].amountDelegatedToStaker -= stakes[_staker].amountStaked;
+        }
 
         emit StakerFrozen(_staker, stakes[_staker].amountStaked);
     }
@@ -656,6 +606,10 @@ contract FraxStaker is OwnedUpgradeable, FraxStakerStructs {
         if (!isFrozenStaker[_staker]) revert NotFrozenStaker();
 
         isFrozenStaker[_staker] = false;
+
+        if (stakes[_staker].delegatee != address(0)) {
+            stakes[stakes[_staker].delegatee].amountDelegatedToStaker += stakes[_staker].amountStaked;
+        }
 
         emit StakerUnfrozen(_staker, stakes[_staker].amountStaked);
     }
@@ -678,7 +632,7 @@ contract FraxStaker is OwnedUpgradeable, FraxStakerStructs {
         blacklist[_staker] = true;
 
         _initiateWithdrawal(_staker);
-        _revokeAllDelegations(_staker);
+        _revokeDelegation(_staker);
 
         emit StakerBlacklisted(_staker, stakes[_staker].amountStaked);
     }

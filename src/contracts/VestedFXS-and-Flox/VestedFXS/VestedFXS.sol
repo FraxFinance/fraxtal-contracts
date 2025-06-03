@@ -214,8 +214,8 @@ contract VestedFXS is ReentrancyGuard, IveFXSStructs, IveFXSEvents {
         address _tokenAddr,
         string memory _name,
         string memory _symbol,
-        string memory _version,
-        bool _setZerothPointHistory
+        string memory _version
+        // bool _setZerothPointHistory
     ) public {
         // Safety checks - no validation on admin in case this is initialized without admin
         if (_tokenAddr == address(0) || token != address(0)) {
@@ -225,12 +225,12 @@ contract VestedFXS is ReentrancyGuard, IveFXSStructs, IveFXSEvents {
         // Set the admin
         admin = _admin;
 
-        // (Optional) Initialize the 0th pointHistory
-        if (_setZerothPointHistory) {
-            pointHistory[0].blk = block.number;
-            pointHistory[0].ts = block.timestamp;
-            pointHistory[0].fxsAmt = 0;
-        }
+        // // (Optional) Initialize the 0th pointHistory
+        // if (_setZerothPointHistory) {
+        //     pointHistory[0].blk = block.number;
+        //     pointHistory[0].ts = block.timestamp;
+        //     pointHistory[0].fxsAmt = 0;
+        // }
 
         // Initialize other variables
         name = _name;

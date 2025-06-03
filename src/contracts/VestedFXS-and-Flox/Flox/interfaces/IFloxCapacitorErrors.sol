@@ -30,6 +30,9 @@ interface IFloxCapacitorErrors {
     /// Emitted when the contract already usin g the veFRAX balances.
     error AlreadyUsingVeFRAX();
 
+    /// Emitted when the array lengths don't match.
+    error ArrayLengthMismatch();
+
     /// Emitted when the delegator is blacklisted by the delegatee.
     error BlacklistedDelegator();
 

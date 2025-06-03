@@ -199,11 +199,77 @@ contract Unit_Test_FraxStaker is BaseTestVeFXS, FraxStakerStructs, OwnedUpgradea
         assertApproxEqAbs(bob.balance, bobBalance - 75e18, 1e15);
         assertEq(address(fraxStaker).balance, 75e18);
 
+        vm.expectEmit(true, false, false, true);
+        emit StakeUpdated(alice, 0, 20e18);
+        vm.expectEmit(true, true, false, true);
+        emit StakeDelegated(alice, bob, 20e18);
+        vm.prank(alice);
+        fraxStaker.stakeFrax{ value: 20e18 }(bob);
+
+        (stakeEntry.amountStaked,,, stakeEntry.unlockTime,, stakeEntry.initiatedWithdrawal) = fraxStaker.stakes(bob);
+
+        assertEq(stakeEntry.amountStaked, 75e18);
+        assertEq(stakeEntry.unlockTime, 0);
+        assertFalse(stakeEntry.initiatedWithdrawal);
+        assertEq(fraxStaker.balanceOf(bob), 95e18);
+        assertEq(fraxStaker.balanceOf(alice), 0);
+        assertApproxEqAbs(bob.balance, bobBalance - 75e18, 1e15);
+        assertApproxEqAbs(alice.balance, aliceBalance - 20e18, 1e15);
+        assertEq(address(fraxStaker).balance, 95e18);
+        (stakeEntry.amountStaked,,,,,) = fraxStaker.stakes(alice);
+        assertEq(stakeEntry.amountStaked, 20e18);
+
+        vm.expectEmit(true, false, false, true);
+        emit StakeUpdated(alice, 20e18, 25e18);
+        vm.expectEmit(true, true, false, true);
+        emit StakeDelegated(alice, bob, 5e18);
+        vm.prank(alice);
+        fraxStaker.stakeFrax{ value: 5e18 }();
+
+        (stakeEntry.amountStaked,,, stakeEntry.unlockTime,, stakeEntry.initiatedWithdrawal) = fraxStaker.stakes(bob);
+
+        assertEq(stakeEntry.amountStaked, 75e18);
+        assertEq(stakeEntry.unlockTime, 0);
+        assertFalse(stakeEntry.initiatedWithdrawal);
+        assertEq(fraxStaker.balanceOf(bob), 100e18);
+        assertEq(fraxStaker.balanceOf(alice), 0);
+        assertApproxEqAbs(bob.balance, bobBalance - 75e18, 1e15);
+        assertApproxEqAbs(alice.balance, aliceBalance - 25e18, 1e15);
+        assertEq(address(fraxStaker).balance, 100e18);
+        (stakeEntry.amountStaked,,,,,) = fraxStaker.stakes(alice);
+        assertEq(stakeEntry.amountStaked, 25e18);
+
         vm.prank(bob);
         fraxStaker.initiateWithdrawal();
 
         vm.expectRevert(WithdrawalInitiated.selector);
         vm.prank(bob);
+        fraxStaker.stakeFrax{ value: 10e18 }();
+
+        vm.prank(claire);
+        fraxStaker.stakeFrax{ value: 10e18 }(alice);
+
+        fraxStaker.addFraxSentinel(bob);
+        vm.prank(bob);
+        fraxStaker.freezeStaker(alice);
+
+        vm.expectRevert(FrozenStaker.selector);
+        vm.prank(claire);
+        fraxStaker.stakeFrax{ value: 10e18 }();
+
+        vm.expectRevert(FrozenStaker.selector);
+        vm.prank(alice);
+        fraxStaker.stakeFrax{ value: 10e18 }();
+
+        vm.prank(bob);
+        fraxStaker.blacklistStaker(alice);
+
+        vm.expectRevert(BlacklistedStaker.selector);
+        vm.prank(claire);
+        fraxStaker.stakeFrax{ value: 10e18 }();
+
+        vm.expectRevert(BlacklistedStaker.selector);
+        vm.prank(alice);
         fraxStaker.stakeFrax{ value: 10e18 }();
 
         vm.prank(frank);
@@ -221,39 +287,28 @@ contract Unit_Test_FraxStaker is BaseTestVeFXS, FraxStakerStructs, OwnedUpgradea
         fraxStaker.initiateWithdrawal();
 
         vm.prank(bob);
-        fraxStaker.stakeFrax{ value: 50e18 }();
-
-        address mockAddress;
-        vm.startPrank(bob);
-        for (uint8 i; i < 255;) {
-            mockAddress = address(uint160(i + 1));
-
-            fraxStaker.delegateStake(mockAddress, 1e14);
-
-            unchecked {
-                ++i;
-            }
-        }
-        vm.stopPrank();
+        fraxStaker.stakeFrax{ value: 50e18 }(alice);
 
         Stake memory stakeEntry;
-        (stakeEntry.amountStaked,,, stakeEntry.unlockTime, stakeEntry.numberOfDelegations, stakeEntry.initiatedWithdrawal) = fraxStaker.stakes(bob);
+        (stakeEntry.amountStaked,,, stakeEntry.unlockTime, stakeEntry.delegatee, stakeEntry.initiatedWithdrawal) = fraxStaker.stakes(bob);
 
         assertEq(stakeEntry.amountStaked, 50e18);
         assertEq(stakeEntry.unlockTime, 0);
-        assertEq(stakeEntry.numberOfDelegations, 255);
+        assertEq(stakeEntry.delegatee, alice);
         assertFalse(stakeEntry.initiatedWithdrawal);
 
+        vm.expectEmit(true, true, false, true);
+        emit DelegationRevocationInitiated(bob, alice, 50e18, block.timestamp + 90 days);
         vm.expectEmit(true, false, false, true);
         emit StakeWithdrawalInitiated(bob, 50e18, block.timestamp + 90 days);
         vm.prank(bob);
         fraxStaker.initiateWithdrawal();
 
-        (stakeEntry.amountStaked,,, stakeEntry.unlockTime, stakeEntry.numberOfDelegations, stakeEntry.initiatedWithdrawal) = fraxStaker.stakes(bob);
+        (stakeEntry.amountStaked,,, stakeEntry.unlockTime, stakeEntry.delegatee, stakeEntry.initiatedWithdrawal) = fraxStaker.stakes(bob);
 
         assertEq(stakeEntry.amountStaked, 50e18);
         assertEq(stakeEntry.unlockTime, block.timestamp + 90 days);
-        assertEq(stakeEntry.numberOfDelegations, 0);
+        assertEq(stakeEntry.delegatee, alice);
         assertTrue(stakeEntry.initiatedWithdrawal);
 
         vm.expectRevert(WithdrawalInitiated.selector);
@@ -300,6 +355,16 @@ contract Unit_Test_FraxStaker is BaseTestVeFXS, FraxStakerStructs, OwnedUpgradea
         fraxStaker.withdrawStake();
 
         skip(90 days);
+
+        fraxStaker.addFraxSentinel(claire);
+        vm.prank(claire);
+        fraxStaker.freezeStaker(bob);
+        vm.expectRevert(FrozenStaker.selector);
+        vm.prank(bob);
+        fraxStaker.withdrawStake();
+        vm.prank(claire);
+        fraxStaker.unfreezeStaker(bob);
+
         vm.expectEmit(true, false, false, true);
         emit StakeUpdated(bob, 50e18, 0);
         vm.prank(bob);
@@ -320,6 +385,141 @@ contract Unit_Test_FraxStaker is BaseTestVeFXS, FraxStakerStructs, OwnedUpgradea
         vm.expectRevert(ContractPaused.selector);
         vm.prank(bob);
         fraxStaker.withdrawStake();
+    }
+
+    function test_forceStakeWithdrawal() public {
+        fraxStakerSetup();
+
+        vm.expectRevert(WithdrawalNotInitiated.selector);
+        vm.prank(frank);
+        fraxStaker.forceStakeWithdrawal(bob);
+
+        vm.prank(bob);
+        fraxStaker.stakeFrax{ value: 50e18 }();
+
+        Stake memory stakeEntry;
+        (stakeEntry.amountStaked,,, stakeEntry.unlockTime,, stakeEntry.initiatedWithdrawal) = fraxStaker.stakes(bob);
+
+        assertEq(stakeEntry.amountStaked, 50e18);
+        assertEq(stakeEntry.unlockTime, 0);
+        assertFalse(stakeEntry.initiatedWithdrawal);
+
+        vm.expectEmit(true, false, false, true);
+        emit StakeWithdrawalInitiated(bob, 50e18, block.timestamp + 90 days);
+        vm.prank(bob);
+        fraxStaker.initiateWithdrawal();
+
+        (stakeEntry.amountStaked,,, stakeEntry.unlockTime,, stakeEntry.initiatedWithdrawal) = fraxStaker.stakes(bob);
+
+        assertEq(stakeEntry.amountStaked, 50e18);
+        assertEq(stakeEntry.unlockTime, block.timestamp + 90 days);
+        assertTrue(stakeEntry.initiatedWithdrawal);
+
+        vm.expectRevert(WithdrawalNotAvailable.selector);
+        vm.prank(frank);
+        fraxStaker.forceStakeWithdrawal(bob);
+
+        skip(90 days);
+
+        fraxStaker.addFraxSentinel(claire);
+        vm.prank(claire);
+        fraxStaker.freezeStaker(bob);
+        vm.expectRevert(FrozenStaker.selector);
+        vm.prank(frank);
+        fraxStaker.forceStakeWithdrawal(bob);
+        vm.prank(claire);
+        fraxStaker.unfreezeStaker(bob);
+
+        vm.expectEmit(true, false, false, true);
+        emit StakeUpdated(bob, 50e18, 0);
+        vm.prank(frank);
+        fraxStaker.forceStakeWithdrawal(bob);
+
+        (stakeEntry.amountStaked,,, stakeEntry.unlockTime,, stakeEntry.initiatedWithdrawal) = fraxStaker.stakes(bob);
+
+        assertEq(stakeEntry.amountStaked, 0);
+        assertEq(stakeEntry.unlockTime, 0);
+        assertFalse(stakeEntry.initiatedWithdrawal);
+
+        assertEq(fraxStaker.balanceOf(bob), 0);
+        assertApproxEqAbs(bob.balance, bobBalance, 1e15);
+        assertEq(address(fraxStaker).balance, 0);
+
+        vm.prank(bob);
+        fraxStaker.stakeFrax{ value: 50e18 }();
+        vm.prank(bob);
+        fraxStaker.initiateWithdrawal();
+        skip(90 days);
+
+        vm.prank(frank);
+        fraxStaker.stopOperation();
+        vm.expectEmit(true, false, false, true);
+        emit StakeUpdated(bob, 50e18, 0);
+        vm.prank(frank);
+        fraxStaker.forceStakeWithdrawal(bob);
+
+        fraxStaker.restartOperation();
+
+        vm.prank(bob);
+        fraxStaker.stakeFrax{ value: 50e18 }(alice);
+
+        (stakeEntry.amountStaked, stakeEntry.amountDelegated,, stakeEntry.unlockTime, stakeEntry.delegatee, stakeEntry.initiatedWithdrawal) = fraxStaker.stakes(bob);
+
+        assertEq(stakeEntry.amountStaked, 50e18);
+        assertEq(stakeEntry.amountDelegated, 50e18);
+        assertEq(stakeEntry.unlockTime, 0);
+        assertEq(stakeEntry.delegatee, alice);
+        assertFalse(stakeEntry.initiatedWithdrawal);
+
+        (stakeEntry.amountStaked,, stakeEntry.amountDelegatedToStaker, stakeEntry.unlockTime, stakeEntry.delegatee, stakeEntry.initiatedWithdrawal) = fraxStaker.stakes(alice);
+
+        assertEq(stakeEntry.amountStaked, 0);
+        assertEq(stakeEntry.amountDelegatedToStaker, 50e18);
+        assertEq(stakeEntry.unlockTime, 0);
+        assertEq(stakeEntry.delegatee, address(0));
+        assertFalse(stakeEntry.initiatedWithdrawal);
+
+        vm.prank(bob);
+        fraxStaker.initiateWithdrawal();
+
+        (stakeEntry.amountStaked, stakeEntry.amountDelegated,, stakeEntry.unlockTime, stakeEntry.delegatee, stakeEntry.initiatedWithdrawal) = fraxStaker.stakes(bob);
+
+        assertEq(stakeEntry.amountStaked, 50e18);
+        assertEq(stakeEntry.amountDelegated, 50e18);
+        assertEq(stakeEntry.unlockTime, block.timestamp + 90 days);
+        assertEq(stakeEntry.delegatee, alice);
+        assertTrue(stakeEntry.initiatedWithdrawal);
+
+        (stakeEntry.amountStaked,, stakeEntry.amountDelegatedToStaker, stakeEntry.unlockTime, stakeEntry.delegatee, stakeEntry.initiatedWithdrawal) = fraxStaker.stakes(alice);
+
+        assertEq(stakeEntry.amountStaked, 0);
+        assertEq(stakeEntry.amountDelegatedToStaker, 50e18);
+        assertEq(stakeEntry.unlockTime, 0);
+        assertEq(stakeEntry.delegatee, address(0));
+        assertFalse(stakeEntry.initiatedWithdrawal);
+
+        skip(95 days);
+
+        vm.prank(frank);
+        vm.expectEmit(true, false, false, true);
+        emit StakeUpdated(bob, 50e18, 0);
+        fraxStaker.forceStakeWithdrawal(bob);
+
+        (stakeEntry.amountStaked, stakeEntry.amountDelegated,, stakeEntry.unlockTime, stakeEntry.delegatee, stakeEntry.initiatedWithdrawal) = fraxStaker.stakes(bob);
+
+        assertEq(stakeEntry.amountStaked, 0);
+        assertEq(stakeEntry.amountDelegated, 0);
+        assertEq(stakeEntry.unlockTime, 0);
+        assertEq(stakeEntry.delegatee, address(0));
+        assertFalse(stakeEntry.initiatedWithdrawal);
+
+        (stakeEntry.amountStaked,, stakeEntry.amountDelegatedToStaker, stakeEntry.unlockTime, stakeEntry.delegatee, stakeEntry.initiatedWithdrawal) = fraxStaker.stakes(alice);
+
+        assertEq(stakeEntry.amountStaked, 0);
+        assertEq(stakeEntry.amountDelegatedToStaker, 0);
+        assertEq(stakeEntry.unlockTime, 0);
+        assertEq(stakeEntry.delegatee, address(0));
+        assertFalse(stakeEntry.initiatedWithdrawal);
     }
 
     function test_addFraxSentinel() public {
@@ -431,10 +631,14 @@ contract Unit_Test_FraxStaker is BaseTestVeFXS, FraxStakerStructs, OwnedUpgradea
         vm.prank(alice);
         fraxStaker.stakeFrax{ value: 70e18 }();
 
-        assertEq(fraxStaker.totalSupply(), 120e18);
+        vm.prank(claire);
+        fraxStaker.stakeFrax{ value: 20e18 }(alice);
+
+        assertEq(fraxStaker.totalSupply(), 140e18);
         assertEq(fraxStaker.balanceOf(bob), 50e18);
-        assertEq(fraxStaker.balanceOf(alice), 70e18);
-        assertEq(address(fraxStaker).balance, 120e18);
+        assertEq(fraxStaker.balanceOf(alice), 90e18);
+        assertEq(fraxStaker.balanceOf(claire), 0);
+        assertEq(address(fraxStaker).balance, 140e18);
         assertApproxEqAbs(bob.balance, bobBalance - 50e18, 1e15);
         assertApproxEqAbs(alice.balance, aliceBalance - 70e18, 1e15);
         assertEq(fraxStaker.SLASHING_RECIPIENT().balance, 0);
@@ -446,10 +650,11 @@ contract Unit_Test_FraxStaker is BaseTestVeFXS, FraxStakerStructs, OwnedUpgradea
         vm.prank(claire);
         fraxStaker.slashStaker(bob, 30e18);
 
-        assertEq(fraxStaker.totalSupply(), 90e18);
+        assertEq(fraxStaker.totalSupply(), 110e18);
         assertEq(fraxStaker.balanceOf(bob), 20e18);
-        assertEq(fraxStaker.balanceOf(alice), 70e18);
-        assertEq(address(fraxStaker).balance, 90e18);
+        assertEq(fraxStaker.balanceOf(alice), 90e18);
+        assertEq(fraxStaker.balanceOf(claire), 0);
+        assertEq(address(fraxStaker).balance, 110e18);
         assertApproxEqAbs(bob.balance, bobBalance - 50e18, 1e15);
         assertApproxEqAbs(alice.balance, aliceBalance - 70e18, 1e15);
         assertEq(fraxStaker.SLASHING_RECIPIENT().balance, 30e18);
@@ -459,13 +664,28 @@ contract Unit_Test_FraxStaker is BaseTestVeFXS, FraxStakerStructs, OwnedUpgradea
         vm.prank(claire);
         fraxStaker.slashStaker(alice, 90e18);
 
-        assertEq(fraxStaker.totalSupply(), 20e18);
+        assertEq(fraxStaker.totalSupply(), 40e18);
         assertEq(fraxStaker.balanceOf(bob), 20e18);
-        assertEq(fraxStaker.balanceOf(alice), 0);
-        assertEq(address(fraxStaker).balance, 20e18);
+        assertEq(fraxStaker.balanceOf(alice), 20e18);
+        assertEq(fraxStaker.balanceOf(claire), 0);
+        assertEq(address(fraxStaker).balance, 40e18);
         assertApproxEqAbs(bob.balance, bobBalance - 50e18, 1e15);
         assertApproxEqAbs(alice.balance, aliceBalance - 70e18, 1e15);
         assertEq(fraxStaker.SLASHING_RECIPIENT().balance, 100e18);
+
+        vm.expectEmit(true, false, false, true);
+        emit Slashed(claire, 10e18);
+        vm.prank(claire);
+        fraxStaker.slashStaker(claire, 10e18);
+
+        assertEq(fraxStaker.totalSupply(), 30e18);
+        assertEq(fraxStaker.balanceOf(bob), 20e18);
+        assertEq(fraxStaker.balanceOf(alice), 10e18);
+        assertEq(fraxStaker.balanceOf(claire), 0);
+        assertEq(address(fraxStaker).balance, 30e18);
+        assertApproxEqAbs(bob.balance, bobBalance - 50e18, 1e15);
+        assertApproxEqAbs(alice.balance, aliceBalance - 70e18, 1e15);
+        assertEq(fraxStaker.SLASHING_RECIPIENT().balance, 110e18);
     }
 
     function test_freezeStaker() public {
@@ -475,25 +695,44 @@ contract Unit_Test_FraxStaker is BaseTestVeFXS, FraxStakerStructs, OwnedUpgradea
         vm.prank(frank);
         fraxStaker.freezeStaker(bob);
 
+        vm.prank(alice);
+        fraxStaker.stakeFrax{ value: 50e18 }(bob);
+
         vm.prank(bob);
         fraxStaker.stakeFrax{ value: 50e18 }();
 
-        assertEq(fraxStaker.totalSupply(), 50e18);
-        assertEq(fraxStaker.balanceOf(bob), 50e18);
-        assertEq(address(fraxStaker).balance, 50e18);
+        assertEq(fraxStaker.totalSupply(), 100e18);
+        assertEq(fraxStaker.balanceOf(bob), 100e18);
+        assertEq(fraxStaker.balanceOf(alice), 0);
+        assertEq(address(fraxStaker).balance, 100e18);
         assertApproxEqAbs(bob.balance, bobBalance - 50e18, 1e15);
+        assertApproxEqAbs(bob.balance, aliceBalance - 50e18, 1e15);
 
         fraxStaker.addFraxSentinel(claire);
+
+        vm.expectEmit(true, false, false, true);
+        emit StakerFrozen(alice, 50e18);
+        vm.prank(claire);
+        fraxStaker.freezeStaker(alice);
+
+        assertEq(fraxStaker.totalSupply(), 100e18);
+        assertEq(fraxStaker.balanceOf(bob), 50e18);
+        assertEq(fraxStaker.balanceOf(alice), 0);
+        assertEq(address(fraxStaker).balance, 100e18);
+        assertApproxEqAbs(bob.balance, bobBalance - 50e18, 1e15);
+        assertApproxEqAbs(bob.balance, aliceBalance - 50e18, 1e15);
 
         vm.expectEmit(true, false, false, true);
         emit StakerFrozen(bob, 50e18);
         vm.prank(claire);
         fraxStaker.freezeStaker(bob);
 
-        assertEq(fraxStaker.totalSupply(), 50e18);
+        assertEq(fraxStaker.totalSupply(), 100e18);
         assertEq(fraxStaker.balanceOf(bob), 0);
-        assertEq(address(fraxStaker).balance, 50e18);
+        assertEq(fraxStaker.balanceOf(alice), 0);
+        assertEq(address(fraxStaker).balance, 100e18);
         assertApproxEqAbs(bob.balance, bobBalance - 50e18, 1e15);
+        assertApproxEqAbs(bob.balance, aliceBalance - 50e18, 1e15);
 
         vm.expectRevert(AlreadyFrozenStaker.selector);
         vm.prank(claire);
@@ -501,7 +740,7 @@ contract Unit_Test_FraxStaker is BaseTestVeFXS, FraxStakerStructs, OwnedUpgradea
 
         vm.expectRevert(InvalidStakeAmount.selector);
         vm.prank(claire);
-        fraxStaker.freezeStaker(alice);
+        fraxStaker.freezeStaker(claire);
 
         vm.expectRevert(FrozenStaker.selector);
         vm.prank(bob);
@@ -556,6 +795,38 @@ contract Unit_Test_FraxStaker is BaseTestVeFXS, FraxStakerStructs, OwnedUpgradea
         vm.expectRevert(NotFrozenStaker.selector);
         vm.prank(claire);
         fraxStaker.unfreezeStaker(bob);
+
+        vm.prank(alice);
+        fraxStaker.stakeFrax{ value: 70e18 }(bob);
+
+        assertEq(fraxStaker.totalSupply(), 120e18);
+        assertEq(fraxStaker.balanceOf(bob), 120e18);
+        assertEq(fraxStaker.balanceOf(alice), 0);
+        assertEq(address(fraxStaker).balance, 120e18);
+        assertApproxEqAbs(bob.balance, bobBalance - 50e18, 1e15);
+        assertApproxEqAbs(alice.balance, aliceBalance - 70e18, 1e15);
+
+        vm.prank(claire);
+        fraxStaker.freezeStaker(alice);
+
+        assertEq(fraxStaker.totalSupply(), 120e18);
+        assertEq(fraxStaker.balanceOf(bob), 50e18);
+        assertEq(fraxStaker.balanceOf(alice), 0);
+        assertEq(address(fraxStaker).balance, 120e18);
+        assertApproxEqAbs(bob.balance, bobBalance - 50e18, 1e15);
+        assertApproxEqAbs(alice.balance, aliceBalance - 70e18, 1e15);
+
+        vm.expectEmit(true, false, false, true);
+        emit StakerUnfrozen(alice, 70e18);
+        vm.prank(claire);
+        fraxStaker.unfreezeStaker(alice);
+
+        assertEq(fraxStaker.totalSupply(), 120e18);
+        assertEq(fraxStaker.balanceOf(bob), 120e18);
+        assertEq(fraxStaker.balanceOf(alice), 0);
+        assertEq(address(fraxStaker).balance, 120e18);
+        assertApproxEqAbs(bob.balance, bobBalance - 50e18, 1e15);
+        assertApproxEqAbs(alice.balance, aliceBalance - 70e18, 1e15);
     }
 
     function test_blacklistStaker() public {
@@ -645,13 +916,15 @@ contract Unit_Test_FraxStaker is BaseTestVeFXS, FraxStakerStructs, OwnedUpgradea
         assertFalse(fraxStaker.isFrozenStaker(alice));
         assertTrue(fraxStaker.blacklist(alice));
 
-        vm.prank(frank);
-        fraxStaker.stakeFrax{ value: 100e18 }();
         address mockAddress = address(uint160(257));
+        vm.prank(frank);
+        fraxStaker.stakeFrax{ value: 1e15 }(mockAddress);
 
+        mockAddress = address(uint160(258));
         vm.startPrank(frank);
         for (uint8 i; i < 255;) {
-            fraxStaker.delegateStake(mockAddress, 1e15);
+            vm.expectRevert(AlreadyDelegatedToAnotherDelegatee.selector);
+            fraxStaker.stakeFrax{ value: 1e15 }(mockAddress);
 
             mockAddress = address(uint160(i + 1));
 
@@ -661,133 +934,90 @@ contract Unit_Test_FraxStaker is BaseTestVeFXS, FraxStakerStructs, OwnedUpgradea
         }
         vm.stopPrank();
 
-        uint8 delegationsNumber;
-        (,,,, delegationsNumber,) = fraxStaker.stakes(frank);
-        assertEq(delegationsNumber, 255);
+        address delegatee;
+        (,,,, delegatee,) = fraxStaker.stakes(frank);
+        assertEq(delegatee, address(uint160(257)));
 
         vm.prank(claire);
         fraxStaker.blacklistStaker(frank);
 
-        (,,,, delegationsNumber,) = fraxStaker.stakes(frank);
-        assertEq(delegationsNumber, 0);
+        (,,,, delegatee,) = fraxStaker.stakes(frank);
+        assertEq(delegatee, address(0));
     }
 
     function test_delegateStake() public {
         fraxStakerSetup();
 
-        vm.prank(bob);
-        fraxStaker.stakeFrax{ value: 50e18 }();
-        vm.prank(alice);
-        fraxStaker.stakeFrax{ value: 30e18 }();
-
         vm.expectRevert(InvalidStakeAmount.selector);
         vm.prank(bob);
-        fraxStaker.delegateStake(alice, 60e18);
+        fraxStaker.stakeFrax{ value: 0 }(alice);
 
         Stake memory stakeEntry;
-        (stakeEntry.amountStaked, stakeEntry.amountDelegated, stakeEntry.amountDelegatedToStaker, stakeEntry.unlockTime, stakeEntry.numberOfDelegations, stakeEntry.initiatedWithdrawal) = fraxStaker.stakes(bob);
-
-        assertEq(stakeEntry.amountStaked, 50e18);
-        assertEq(stakeEntry.amountDelegated, 0);
-        assertEq(stakeEntry.amountDelegatedToStaker, 0);
-        assertEq(stakeEntry.unlockTime, 0);
-        assertEq(stakeEntry.numberOfDelegations, 0);
-        assertFalse(stakeEntry.initiatedWithdrawal);
-        assertEq(fraxStaker.balanceOf(bob), 50e18);
-        assertEq(fraxStaker.stakerDelegatees(bob, 0), address(0));
-        assertEq(fraxStaker.stakerDelegatees(bob, 1), address(0));
-
-        (stakeEntry.amountStaked, stakeEntry.amountDelegated, stakeEntry.amountDelegatedToStaker, stakeEntry.unlockTime, stakeEntry.numberOfDelegations, stakeEntry.initiatedWithdrawal) = fraxStaker.stakes(alice);
-
-        assertEq(stakeEntry.amountStaked, 30e18);
-        assertEq(stakeEntry.amountDelegated, 0);
-        assertEq(stakeEntry.amountDelegatedToStaker, 0);
-        assertEq(stakeEntry.unlockTime, 0);
-        assertEq(stakeEntry.numberOfDelegations, 0);
-        assertFalse(stakeEntry.initiatedWithdrawal);
-        assertEq(fraxStaker.balanceOf(alice), 30e18);
-        assertEq(fraxStaker.stakerDelegatees(alice, 0), address(0));
-        assertEq(fraxStaker.stakerDelegatees(alice, 1), address(0));
+        (stakeEntry.amountStaked, stakeEntry.amountDelegated, stakeEntry.amountDelegatedToStaker, stakeEntry.unlockTime, stakeEntry.delegatee, stakeEntry.initiatedWithdrawal) = fraxStaker.stakes(bob);
 
         vm.expectEmit(true, true, false, true);
         emit StakeDelegated(bob, alice, 20e18);
         vm.prank(bob);
-        fraxStaker.delegateStake(alice, 20e18);
+        fraxStaker.stakeFrax{ value: 20e18 }(alice);
 
-        (stakeEntry.amountStaked, stakeEntry.amountDelegated, stakeEntry.amountDelegatedToStaker, stakeEntry.unlockTime, stakeEntry.numberOfDelegations, stakeEntry.initiatedWithdrawal) = fraxStaker.stakes(bob);
+        (stakeEntry.amountStaked, stakeEntry.amountDelegated, stakeEntry.amountDelegatedToStaker, stakeEntry.unlockTime, stakeEntry.delegatee, stakeEntry.initiatedWithdrawal) = fraxStaker.stakes(bob);
 
-        assertEq(stakeEntry.amountStaked, 50e18);
+        assertEq(stakeEntry.amountStaked, 20e18);
         assertEq(stakeEntry.amountDelegated, 20e18);
         assertEq(stakeEntry.amountDelegatedToStaker, 0);
         assertEq(stakeEntry.unlockTime, 0);
-        assertEq(stakeEntry.numberOfDelegations, 1);
+        assertEq(stakeEntry.delegatee, alice);
         assertFalse(stakeEntry.initiatedWithdrawal);
-        assertEq(fraxStaker.balanceOf(bob), 30e18);
-        assertEq(fraxStaker.stakerDelegatees(bob, 0), alice);
-        assertEq(fraxStaker.stakerDelegatees(bob, 1), address(0));
+        assertEq(fraxStaker.balanceOf(bob), 0);
 
-        (stakeEntry.amountStaked, stakeEntry.amountDelegated, stakeEntry.amountDelegatedToStaker, stakeEntry.unlockTime, stakeEntry.numberOfDelegations, stakeEntry.initiatedWithdrawal) = fraxStaker.stakes(alice);
+        (stakeEntry.amountStaked, stakeEntry.amountDelegated, stakeEntry.amountDelegatedToStaker, stakeEntry.unlockTime, stakeEntry.delegatee, stakeEntry.initiatedWithdrawal) = fraxStaker.stakes(alice);
 
-        assertEq(stakeEntry.amountStaked, 30e18);
+        assertEq(stakeEntry.amountStaked, 0);
         assertEq(stakeEntry.amountDelegated, 0);
         assertEq(stakeEntry.amountDelegatedToStaker, 20e18);
         assertEq(stakeEntry.unlockTime, 0);
-        assertEq(stakeEntry.numberOfDelegations, 0);
+        assertEq(stakeEntry.delegatee, address(0));
         assertFalse(stakeEntry.initiatedWithdrawal);
-        assertEq(fraxStaker.balanceOf(alice), 50e18);
-        assertEq(fraxStaker.stakerDelegatees(alice, 0), address(0));
-        assertEq(fraxStaker.stakerDelegatees(alice, 1), address(0));
+        assertEq(fraxStaker.balanceOf(alice), 20e18);
 
         vm.expectEmit(true, true, false, true);
         emit StakeDelegated(alice, bob, 10e18);
         vm.prank(alice);
-        fraxStaker.delegateStake(bob, 10e18);
+        fraxStaker.stakeFrax{ value: 10e18 }(bob);
 
-        (stakeEntry.amountStaked, stakeEntry.amountDelegated, stakeEntry.amountDelegatedToStaker, stakeEntry.unlockTime, stakeEntry.numberOfDelegations, stakeEntry.initiatedWithdrawal) = fraxStaker.stakes(bob);
+        (stakeEntry.amountStaked, stakeEntry.amountDelegated, stakeEntry.amountDelegatedToStaker, stakeEntry.unlockTime, stakeEntry.delegatee, stakeEntry.initiatedWithdrawal) = fraxStaker.stakes(bob);
 
-        assertEq(stakeEntry.amountStaked, 50e18);
+        assertEq(stakeEntry.amountStaked, 20e18);
         assertEq(stakeEntry.amountDelegated, 20e18);
         assertEq(stakeEntry.amountDelegatedToStaker, 10e18);
         assertEq(stakeEntry.unlockTime, 0);
-        assertEq(stakeEntry.numberOfDelegations, 1);
+        assertEq(stakeEntry.delegatee, alice);
         assertFalse(stakeEntry.initiatedWithdrawal);
-        assertEq(fraxStaker.balanceOf(bob), 40e18);
-        assertEq(fraxStaker.stakerDelegatees(bob, 0), alice);
-        assertEq(fraxStaker.stakerDelegatees(bob, 1), address(0));
+        assertEq(fraxStaker.balanceOf(bob), 10e18);
 
-        (stakeEntry.amountStaked, stakeEntry.amountDelegated, stakeEntry.amountDelegatedToStaker, stakeEntry.unlockTime, stakeEntry.numberOfDelegations, stakeEntry.initiatedWithdrawal) = fraxStaker.stakes(alice);
+        (stakeEntry.amountStaked, stakeEntry.amountDelegated, stakeEntry.amountDelegatedToStaker, stakeEntry.unlockTime, stakeEntry.delegatee, stakeEntry.initiatedWithdrawal) = fraxStaker.stakes(alice);
 
-        assertEq(stakeEntry.amountStaked, 30e18);
+        assertEq(stakeEntry.amountStaked, 10e18);
         assertEq(stakeEntry.amountDelegated, 10e18);
         assertEq(stakeEntry.amountDelegatedToStaker, 20e18);
         assertEq(stakeEntry.unlockTime, 0);
-        assertEq(stakeEntry.numberOfDelegations, 1);
+        assertEq(stakeEntry.delegatee, bob);
         assertFalse(stakeEntry.initiatedWithdrawal);
-        assertEq(fraxStaker.balanceOf(alice), 40e18);
-        assertEq(fraxStaker.stakerDelegatees(alice, 0), bob);
-        assertEq(fraxStaker.stakerDelegatees(alice, 1), address(0));
+        assertEq(fraxStaker.balanceOf(alice), 20e18);
+
+        hoax(frank);
+        fraxStaker.stakeFrax{ value: 10e18 }();
+        vm.expectRevert(NonDelegatedStakeAlreadyExists.selector);
+        vm.prank(frank);
+        fraxStaker.stakeFrax{ value: 10e18 }(bob);
 
         vm.expectRevert(CannotDelegateToSelf.selector);
         vm.prank(bob);
-        fraxStaker.delegateStake(bob, 10e18);
+        fraxStaker.stakeFrax{ value: 10e18 }(bob);
 
         vm.expectRevert(InvalidStakeAmount.selector);
         vm.prank(bob);
-        fraxStaker.delegateStake(alice, 50e18);
-
-        uint8 currentDelegationCount = stakeEntry.numberOfDelegations;
-        address mockDelegatee = address(uint160(currentDelegationCount));
-        while (currentDelegationCount < 255) {
-            vm.prank(alice);
-            fraxStaker.delegateStake(mockDelegatee, 1);
-
-            currentDelegationCount++;
-            mockDelegatee = address(uint160(currentDelegationCount));
-        }
-
-        vm.expectRevert(TooManyDelegations.selector);
-        vm.prank(alice);
-        fraxStaker.delegateStake(mockDelegatee, 1);
+        fraxStaker.stakeFrax{ value: 0 }(alice);
 
         fraxStaker.addFraxSentinel(frank);
 
@@ -796,233 +1026,34 @@ contract Unit_Test_FraxStaker is BaseTestVeFXS, FraxStakerStructs, OwnedUpgradea
 
         vm.expectRevert(FrozenStaker.selector);
         vm.prank(bob);
-        fraxStaker.delegateStake(alice, 10e18);
+        fraxStaker.stakeFrax{ value: 10e18 }(alice);
 
         vm.prank(frank);
         fraxStaker.blacklistStaker(alice);
 
         vm.expectRevert(BlacklistedStaker.selector);
         vm.prank(bob);
-        fraxStaker.delegateStake(alice, 10e18);
+        fraxStaker.stakeFrax{ value: 10e18 }(alice);
 
         vm.prank(frank);
         fraxStaker.freezeStaker(bob);
 
         vm.expectRevert(FrozenStaker.selector);
         vm.prank(bob);
-        fraxStaker.delegateStake(alice, 10e18);
+        fraxStaker.stakeFrax{ value: 10e18 }(alice);
 
         vm.prank(frank);
         fraxStaker.blacklistStaker(bob);
 
         vm.expectRevert(BlacklistedStaker.selector);
         vm.prank(bob);
-        fraxStaker.delegateStake(alice, 10e18);
+        fraxStaker.stakeFrax{ value: 10e18 }(alice);
 
         vm.prank(frank);
         fraxStaker.stopOperation();
 
         vm.expectRevert(ContractPaused.selector);
         vm.prank(bob);
-        fraxStaker.delegateStake(alice, 10e18);
-    }
-
-    function test_revokeDelegation() public {
-        fraxStakerSetup();
-
-        vm.prank(bob);
-        fraxStaker.stakeFrax{ value: 50e18 }();
-        vm.prank(alice);
-        fraxStaker.stakeFrax{ value: 30e18 }();
-
-        vm.prank(bob);
-        fraxStaker.delegateStake(alice, 20e18);
-        vm.prank(alice);
-        fraxStaker.delegateStake(bob, 10e18);
-
-        Stake memory stakeEntry;
-        (stakeEntry.amountStaked, stakeEntry.amountDelegated, stakeEntry.amountDelegatedToStaker, stakeEntry.unlockTime, stakeEntry.numberOfDelegations, stakeEntry.initiatedWithdrawal) = fraxStaker.stakes(bob);
-
-        assertEq(stakeEntry.amountStaked, 50e18);
-        assertEq(stakeEntry.amountDelegated, 20e18);
-        assertEq(stakeEntry.amountDelegatedToStaker, 10e18);
-        assertEq(stakeEntry.unlockTime, 0);
-        assertEq(stakeEntry.numberOfDelegations, 1);
-        assertFalse(stakeEntry.initiatedWithdrawal);
-        assertEq(fraxStaker.balanceOf(bob), 40e18);
-        assertEq(fraxStaker.stakerDelegatees(bob, 0), alice);
-        assertEq(fraxStaker.stakerDelegatees(bob, 1), address(0));
-
-        (stakeEntry.amountStaked, stakeEntry.amountDelegated, stakeEntry.amountDelegatedToStaker, stakeEntry.unlockTime, stakeEntry.numberOfDelegations, stakeEntry.initiatedWithdrawal) = fraxStaker.stakes(alice);
-
-        assertEq(stakeEntry.amountStaked, 30e18);
-        assertEq(stakeEntry.amountDelegated, 10e18);
-        assertEq(stakeEntry.amountDelegatedToStaker, 20e18);
-        assertEq(stakeEntry.unlockTime, 0);
-        assertEq(stakeEntry.numberOfDelegations, 1);
-        assertFalse(stakeEntry.initiatedWithdrawal);
-        assertEq(fraxStaker.balanceOf(alice), 40e18);
-        assertEq(fraxStaker.stakerDelegatees(alice, 0), bob);
-        assertEq(fraxStaker.stakerDelegatees(alice, 1), address(0));
-
-        vm.expectRevert(InvalidStakeAmount.selector);
-        vm.prank(bob);
-        fraxStaker.revokeDelegation(frank);
-
-        vm.prank(bob);
-        fraxStaker.delegateStake(frank, 10e18);
-        vm.prank(bob);
-        fraxStaker.delegateStake(address(uint160(42)), 5e18);
-
-        (stakeEntry.amountStaked, stakeEntry.amountDelegated, stakeEntry.amountDelegatedToStaker, stakeEntry.unlockTime, stakeEntry.numberOfDelegations, stakeEntry.initiatedWithdrawal) = fraxStaker.stakes(bob);
-
-        assertEq(stakeEntry.amountStaked, 50e18);
-        assertEq(stakeEntry.amountDelegated, 35e18);
-        assertEq(stakeEntry.amountDelegatedToStaker, 10e18);
-        assertEq(stakeEntry.unlockTime, 0);
-        assertEq(stakeEntry.numberOfDelegations, 3);
-        assertFalse(stakeEntry.initiatedWithdrawal);
-        assertEq(fraxStaker.balanceOf(bob), 25e18);
-        assertEq(fraxStaker.stakerDelegatees(bob, 0), alice);
-        assertEq(fraxStaker.stakerDelegatees(bob, 1), frank);
-        assertEq(fraxStaker.stakerDelegatees(bob, 2), address(uint160(42)));
-        assertEq(fraxStaker.stakerDelegatees(bob, 3), address(0));
-
-        (stakeEntry.amountStaked, stakeEntry.amountDelegated, stakeEntry.amountDelegatedToStaker, stakeEntry.unlockTime, stakeEntry.numberOfDelegations, stakeEntry.initiatedWithdrawal) = fraxStaker.stakes(alice);
-
-        assertEq(stakeEntry.amountStaked, 30e18);
-        assertEq(stakeEntry.amountDelegated, 10e18);
-        assertEq(stakeEntry.amountDelegatedToStaker, 20e18);
-        assertEq(stakeEntry.unlockTime, 0);
-        assertEq(stakeEntry.numberOfDelegations, 1);
-        assertFalse(stakeEntry.initiatedWithdrawal);
-        assertEq(fraxStaker.balanceOf(alice), 40e18);
-        assertEq(fraxStaker.stakerDelegatees(alice, 0), bob);
-        assertEq(fraxStaker.stakerDelegatees(alice, 1), address(0));
-
-        vm.expectEmit(true, true, false, true);
-        emit StakeDelegationRevoked(bob, alice, 20e18);
-        vm.prank(bob);
-        fraxStaker.revokeDelegation(alice);
-
-        (stakeEntry.amountStaked, stakeEntry.amountDelegated, stakeEntry.amountDelegatedToStaker, stakeEntry.unlockTime, stakeEntry.numberOfDelegations, stakeEntry.initiatedWithdrawal) = fraxStaker.stakes(bob);
-
-        assertEq(stakeEntry.amountStaked, 50e18);
-        assertEq(stakeEntry.amountDelegated, 15e18);
-        assertEq(stakeEntry.amountDelegatedToStaker, 10e18);
-        assertEq(stakeEntry.unlockTime, 0);
-        assertEq(stakeEntry.numberOfDelegations, 2);
-        assertFalse(stakeEntry.initiatedWithdrawal);
-        assertEq(fraxStaker.balanceOf(bob), 45e18);
-        assertEq(fraxStaker.stakerDelegatees(bob, 0), address(uint160(42)));
-        assertEq(fraxStaker.stakerDelegatees(bob, 1), frank);
-        assertEq(fraxStaker.stakerDelegatees(bob, 2), address(0));
-        assertEq(fraxStaker.stakerDelegatees(bob, 3), address(0));
-
-        (stakeEntry.amountStaked, stakeEntry.amountDelegated, stakeEntry.amountDelegatedToStaker, stakeEntry.unlockTime, stakeEntry.numberOfDelegations, stakeEntry.initiatedWithdrawal) = fraxStaker.stakes(alice);
-
-        assertEq(stakeEntry.amountStaked, 30e18);
-        assertEq(stakeEntry.amountDelegated, 10e18);
-        assertEq(stakeEntry.amountDelegatedToStaker, 0);
-        assertEq(stakeEntry.unlockTime, 0);
-        assertEq(stakeEntry.numberOfDelegations, 1);
-        assertFalse(stakeEntry.initiatedWithdrawal);
-        assertEq(fraxStaker.balanceOf(alice), 20e18);
-        assertEq(fraxStaker.stakerDelegatees(alice, 0), bob);
-        assertEq(fraxStaker.stakerDelegatees(alice, 1), address(0));
-
-        fraxStaker.addFraxSentinel(frank);
-        vm.prank(frank);
-        fraxStaker.freezeStaker(bob);
-
-        vm.expectRevert(FrozenStaker.selector);
-        vm.prank(bob);
-        fraxStaker.revokeDelegation(frank);
-
-        vm.prank(frank);
-        fraxStaker.blacklistStaker(bob);
-
-        vm.expectRevert(BlacklistedStaker.selector);
-        vm.prank(bob);
-        fraxStaker.revokeDelegation(frank);
-
-        vm.prank(frank);
-        fraxStaker.stopOperation();
-
-        vm.expectRevert(ContractPaused.selector);
-        vm.prank(bob);
-        fraxStaker.revokeDelegation(frank);
-    }
-
-    function test_revokeAllDelegations() public {
-        fraxStakerSetup();
-
-        vm.prank(bob);
-        fraxStaker.stakeFrax{ value: 50e18 }();
-
-        uint8 delegationsNumber;
-        (,,,, delegationsNumber,) = fraxStaker.stakes(bob);
-        assertEq(delegationsNumber, 0);
-
-        address mockAddress;
-
-        vm.startPrank(bob);
-        for (uint8 i; i < 255;) {
-            mockAddress = address(uint160(i + 1));
-
-            fraxStaker.delegateStake(mockAddress, 1e15);
-
-            unchecked {
-                ++i;
-            }
-        }
-        vm.stopPrank();
-
-        (,,,, delegationsNumber,) = fraxStaker.stakes(bob);
-        assertEq(delegationsNumber, 255);
-
-        uint256 amountDelegated;
-        (,, amountDelegated,,,) = fraxStaker.stakes(mockAddress);
-        assertEq(amountDelegated, 1e15);
-        assertEq(fraxStaker.balanceOf(bob), 50e18 - 255 * 1e15);
-        assertEq(fraxStaker.balanceOf(mockAddress), 1e15);
-        assertEq(fraxStaker.stakerDelegatees(bob, 0), address(1));
-        assertEq(fraxStaker.stakerDelegatees(bob, 254), mockAddress);
-
-        vm.prank(bob);
-        fraxStaker.revokeAllDelegations();
-
-        (,,,, delegationsNumber,) = fraxStaker.stakes(bob);
-        assertEq(delegationsNumber, 0);
-
-        (,, amountDelegated,,,) = fraxStaker.stakes(mockAddress);
-        assertEq(amountDelegated, 0);
-        assertEq(fraxStaker.balanceOf(bob), 50e18);
-        assertEq(fraxStaker.balanceOf(mockAddress), 0);
-        assertEq(fraxStaker.stakerDelegatees(bob, 0), address(0));
-        assertEq(fraxStaker.stakerDelegatees(bob, 1), address(0));
-        assertEq(fraxStaker.stakerDelegatees(bob, 254), address(0));
-
-        fraxStaker.addFraxSentinel(frank);
-        vm.prank(frank);
-        fraxStaker.freezeStaker(bob);
-
-        vm.expectRevert(FrozenStaker.selector);
-        vm.prank(bob);
-        fraxStaker.revokeAllDelegations();
-
-        vm.prank(frank);
-        fraxStaker.blacklistStaker(bob);
-
-        vm.expectRevert(BlacklistedStaker.selector);
-        vm.prank(bob);
-        fraxStaker.revokeAllDelegations();
-
-        vm.prank(frank);
-        fraxStaker.stopOperation();
-
-        vm.expectRevert(ContractPaused.selector);
-        vm.prank(bob);
-        fraxStaker.revokeAllDelegations();
+        fraxStaker.stakeFrax{ value: 10e18 }(alice);
     }
 }
