@@ -8,11 +8,17 @@ import { DeployL1VeFXSTotalSupplyOracle } from "src/script/VestedFXS-and-Flox/De
 import { DeployYieldDistributor } from "src/script/VestedFXS-and-Flox/DeployYieldDistributor.s.sol";
 import { DeployVeFXSAggregator } from "src/script/VestedFXS-and-Flox/DeployVeFXSAggregator.s.sol";
 import { DeployVestedFXS } from "src/script/VestedFXS-and-Flox/DeployVestedFXS.s.sol";
+import { DeployFloxCapacitor } from "src/script/VestedFXS-and-Flox/DeployFloxCapacitor.s.sol";
+import { DeployFloxConverter } from "src/script/VestedFXS-and-Flox/DeployFloxConverter.s.sol";
+import { DeployFraxStaker } from "src/script/VestedFXS-and-Flox/DeployFraxStaker.s.sol";
 import { FloxIncentivesDistributor } from "src/contracts/VestedFXS-and-Flox/Flox/FloxIncentivesDistributor.sol";
+import { FloxCapacitor } from "src/contracts/VestedFXS-and-Flox/Flox/FloxCapacitor.sol";
+import { FloxConverter } from "src/contracts/VestedFXS-and-Flox/Flox/FloxConverter.sol";
 import { L1VeFXS } from "src/contracts/VestedFXS-and-Flox/VestedFXS/L1VeFXS.sol";
 import { L1VeFXSTotalSupplyOracle } from "src/contracts/VestedFXS-and-Flox/VestedFXS/L1VeFXSTotalSupplyOracle.sol";
 import { FPISLocker } from "src/contracts/VestedFXS-and-Flox/FPISLocker/FPISLocker.sol";
 import { FPISLockerUtils } from "src/contracts/VestedFXS-and-Flox/FPISLocker/FPISLockerUtils.sol";
+import { FraxStaker } from "src/contracts/VestedFXS-and-Flox/FraxStaker/FraxStaker.sol";
 import { YieldDistributor } from "src/contracts/VestedFXS-and-Flox/VestedFXS/YieldDistributor.sol";
 import { VeFXSAggregator } from "src/contracts/VestedFXS-and-Flox/VestedFXS/VeFXSAggregator.sol";
 import { VestedFXS } from "src/contracts/VestedFXS-and-Flox/VestedFXS/VestedFXS.sol";
@@ -23,7 +29,7 @@ import { IveFXSStructs } from "src/contracts/VestedFXS-and-Flox/VestedFXS/IveFXS
 import { console } from "frax-std/FraxTest.sol";
 import { FraxTest } from "frax-std/FraxTest.sol";
 import "src/Constants.sol" as Constants;
-import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import "@openzeppelin-4/contracts/token/ERC20/IERC20.sol";
 
 contract BaseTestVeFXS is FraxTest, IveFXSEvents, IveFXSStructs, Constants.Helper {
     // VeFXS-specific
@@ -47,6 +53,18 @@ contract BaseTestVeFXS is FraxTest, IveFXSEvents, IveFXSStructs, Constants.Helpe
     // =========================================
     L1VeFXS public l1VeFXS;
     L1VeFXSTotalSupplyOracle public l1VeFXSTotalSupplyOracle;
+
+    // FloxCapacitpr
+    // =========================================
+    FloxCapacitor public floxCap;
+
+    // FraxStaker
+    // =========================================
+    FraxStaker public fraxStaker;
+
+    // FloxConverter
+    // =========================================
+    FloxConverter public floxConverter;
 
     // Misc
     // =========================================
@@ -131,6 +149,18 @@ contract BaseTestVeFXS is FraxTest, IveFXSEvents, IveFXSStructs, Constants.Helpe
         // Deploy the veFXS contracts
         yieldDistributor = (new DeployYieldDistributor()).runTest(address(token), address(veFXSAggregator));
         vm.label(address(yieldDistributor), "VeFXSYldDistPxy");
+
+        // Deploy the FraxStaker
+        fraxStaker = (new DeployFraxStaker()).runTest(address(this), "FraxStaker");
+        vm.label(address(fraxStaker), "FraxStaker");
+
+        // Deploy the FloxCapacitor
+        floxCap = (new DeployFloxCapacitor()).runTest(address(fraxStaker), address(this), address(veFXSAggregator), "FloxCAP");
+        vm.label(address(floxCap), "FloxCAP");
+
+        // Deploy the FloxConverter
+        floxConverter = (new DeployFloxConverter()).runTest(address(floxCap), address(this), address(token), "FloxConverter");
+        vm.label(address(floxConverter), "FloxConverter");
 
         // Set up the Flox Incentives Distributor
         flox = new FloxIncentivesDistributor(address(vestedFXS), address(token));

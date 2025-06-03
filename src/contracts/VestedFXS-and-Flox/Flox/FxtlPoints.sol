@@ -14,7 +14,7 @@ pragma solidity >=0.8.0;
 
 import { OwnedV2 } from "src/contracts/VestedFXS-and-Flox/VestedFXS/OwnedV2.sol";
 import { IFxtlPointsEvents } from "./IFxtlPointsEvents.sol";
-import { ERC20 } from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
+import { ERC20 } from "@openzeppelin-4/contracts/token/ERC20/ERC20.sol";
 
 /**
  * @title FxtlPoints

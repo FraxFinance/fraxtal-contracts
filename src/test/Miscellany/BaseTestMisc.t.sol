@@ -6,7 +6,7 @@ import { DeployFraxFarmQuitCreditors_UniV3 } from "src/script/Miscellany/DeployF
 import { DeploySfraxMintRedeemer } from "src/script/Miscellany/DeploySfraxMintRedeemer.s.sol";
 import { DeployTimedLocker } from "src/script/Miscellany/DeployTimedLocker.s.sol";
 import { FraxtalERC4626MintRedeemer } from "src/contracts/Miscellany/FraxtalERC4626MintRedeemer.sol";
-import { IERC20Metadata } from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
+import { IERC20Metadata } from "@openzeppelin-4/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 import { ManualPriceOracle } from "src/contracts/Miscellany/ManualPriceOracle.sol";
 import { MintableBurnableTestERC20 } from "src/test/VestedFXS-and-Flox/helpers/MintableBurnableTestERC20.sol";
 import { FraxFarmQuitCreditor_UniV3 } from "src/contracts/Miscellany/FraxFarmQuitCreditor/FraxFarmQuitCreditor_UniV3.sol";
@@ -14,7 +14,7 @@ import { INonfungiblePositionManager, ComboOracle_UniV2_UniV3, IFraxFarmUniV3 } 
 import { TimedLocker } from "src/contracts/Miscellany/TimedLocker.sol";
 import { console } from "frax-std/FraxTest.sol";
 import "src/Constants.sol" as Constants;
-import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import "@openzeppelin-4/contracts/token/ERC20/IERC20.sol";
 
 contract BaseTestMisc is FraxTest, Constants.Helper {
     // FraxtalERC4626MintRedeemer

@@ -48,6 +48,7 @@ contract DeploySfraxMintRedeemer is BaseScript {
     {
         // Initialize tempAdmin and eventualAdmin
         tempAdmin = msg.sender;
+        eventualAdmin = msg.sender;
 
         if (vm.envBool("IS_PROD")) {
             // Prod deploy
@@ -60,11 +61,18 @@ contract DeploySfraxMintRedeemer is BaseScript {
             initialVaultTknPrice = 1.0571e18;
         } else {
             // Test deploy
-            eventualAdmin = address(0);
+            // eventualAdmin = address(0);
             fraxOracle = address(deployManualPriceOracle(tempAdmin, frax, 1e6));
             sfraxOracle = address(deployManualPriceOracle(tempAdmin, sfrax, 1.04e6));
             fee = 0.0000001e18;
             initialVaultTknPrice = 1.04e18;
+
+            // // Test deploy
+            // eventualAdmin = address(0);
+            // fraxOracle = address(deployManualPriceOracle(tempAdmin, frax, 1e6));
+            // sfraxOracle = address(deployManualPriceOracle(tempAdmin, sfrax, 1e6));
+            // fee = 0.0000001e18;
+            // initialVaultTknPrice = 1e18;
         }
 
         // Print the timestamp

@@ -4,7 +4,7 @@ pragma solidity >=0.8.0;
 import { FraxTest } from "frax-std/FraxTest.sol";
 import "src/Constants.sol" as Constants;
 import { FPISMerger } from "src/contracts/VestedFXS-and-Flox/FPISMerger/FPISMerger.sol";
-import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import "@openzeppelin-4/contracts/token/ERC20/IERC20.sol";
 
 // This test is isolated from BaseTestVeFXS.t.sol
 contract Unit_Test_FPISMerger is FraxTest {

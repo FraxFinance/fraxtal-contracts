@@ -14,7 +14,7 @@ import { IlFPISStructs } from "src/contracts/VestedFXS-and-Flox/FPISLocker/IlFPI
 import { console } from "frax-std/FraxTest.sol";
 import { FraxTest } from "frax-std/FraxTest.sol";
 import "src/Constants.sol" as Constants;
-import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import "@openzeppelin-4/contracts/token/ERC20/IERC20.sol";
 
 contract BaseTestLFPIS is FraxTest, IlFPISEvents, IlFPISStructs, Constants.Helper {
     // LFPIS-specific

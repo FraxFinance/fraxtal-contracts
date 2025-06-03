@@ -34,7 +34,7 @@ pragma solidity >=0.8.0;
  */
 import { IFPISLocker } from "src/contracts/VestedFXS-and-Flox/interfaces/IFPISLocker.sol";
 import { IlFPISStructs } from "src/contracts/VestedFXS-and-Flox/FPISLocker/IlFPISStructs.sol";
-import { IERC20Metadata } from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
+import { IERC20Metadata } from "@openzeppelin-4/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 import "forge-std/console2.sol";
 
 /**

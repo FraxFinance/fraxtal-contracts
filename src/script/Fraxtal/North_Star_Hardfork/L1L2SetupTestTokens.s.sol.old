@@ -1,0 +1,128 @@
+// SPDX-License-Identifier: UNLICENSED
+pragma solidity ^0.8.0;
+
+import "./UpgradeDevnetCGT.s.sol";
+
+contract L1L2SetupTestTokens is UpgradeDevnetCGT {
+    // Check https://github.com/ethereum-optimism/optimism/blob/6a871c54512ebdb749f46ccb7d27b1b60510eba1/op-deployer/pkg/deployer/init.go#L112 for logic
+    uint256 ethOwnerPk = vm.deriveKey(mnemonic, "m/44'/60'/2'/2151908/", 1);
+
+    // Track nonces
+    uint64 _currNonceL1;
+    uint64 _currNonceL2;
+
+    // Prevent duplicate ERC20 Names
+    string version = "-MK1";
+
+    function setUp() public override {
+        super.setUp();
+    }
+
+    function run() public override {
+        // Start on L1 (should be on here already)
+        vm.createSelectFork(vm.rpcUrl("l1_devnet"));
+        vm.startBroadcast();
+        _currNonceL1 = vm.getNonce(testerAddress);
+
+        // On L1
+        // =========================================
+        L1Token = new MockERC20Owned(string.concat("Native L1 Token", version), string.concat("L1T", version));
+
+        // Mint to test address
+        L1Token.mint(testerAddress, 100_000e18);
+
+        _currNonceL1 += 2;
+        vm.makePersistent(address(L1Token));
+
+        // On L2
+        // =========================================
+        // Move to L2
+        vm.stopBroadcast();
+        vm.createSelectFork(vm.rpcUrl("l2_devnet"));
+        vm.startBroadcast();
+        _currNonceL2 = vm.getNonce(testerAddress);
+
+        // Deploy the L2 ERC20s now
+        LegacyL2Token = new LegacyMintableERC20({
+            _l2Bridge: address(l2StandardBridge),
+            _l1Token: address(L1Token),
+            _name: string.concat("LegacyL2-", L1Token.name()),
+            _symbol: string.concat("LegacyL2-", L1Token.symbol())
+        });
+        L2Token = OptimismMintableERC20(
+            l2OptimismMintableERC20Factory.createStandardL2Token(
+                address(L1Token),
+                string(abi.encodePacked("L2-", L1Token.name())),
+                string(abi.encodePacked("L2-", L1Token.symbol()))
+            )
+        );
+        BadL2Token = OptimismMintableERC20(
+            address(
+                OptimismMintableERC20(
+                    l2OptimismMintableERC20Factory.createStandardL2Token(
+                        address(1),
+                        string(abi.encodePacked("L2-", L1Token.name())),
+                        string(abi.encodePacked("L2-", L1Token.symbol()))
+                    )
+                )
+            )
+        );
+        NativeL2Token = new MockERC20Owned(string.concat("Native L2 Token", version), string.concat("L2T", version));
+        address nativeL2TknAddr = address(NativeL2Token);
+        string memory nativeL2TknName = NativeL2Token.name();
+        string memory nativeL2TknSymbol = NativeL2Token.symbol();
+
+        // Mint to test address
+        NativeL2Token.mint(testerAddress, 100_000e18);
+
+        _currNonceL2 += 5;
+        vm.makePersistent(address(LegacyL2Token));
+        vm.makePersistent(address(L2Token));
+        vm.makePersistent(address(BadL2Token));
+        vm.makePersistent(address(NativeL2Token));
+
+        // Back to L1
+        // =========================================
+        // Move back to L1
+        vm.stopBroadcast();
+        vm.createSelectFork(vm.rpcUrl("l1_devnet"));
+        vm.startBroadcast();
+        vm.setNonce(testerAddress, _currNonceL1);
+
+        // Deploy L2-native tokens IOUs on L1
+        RemoteL1Token = OptimismMintableERC20(
+            l1OptimismMintableERC20Factory.createStandardL2Token(
+                nativeL2TknAddr,
+                string(abi.encodePacked("L1-", nativeL2TknName, version)),
+                string(abi.encodePacked("L1-", nativeL2TknSymbol, version))
+            )
+        );
+        BadL1Token = OptimismMintableERC20(
+            address(
+                OptimismMintableERC20(
+                    l1OptimismMintableERC20Factory.createStandardL2Token(
+                        address(1),
+                        string(abi.encodePacked("L1-", nativeL2TknName, version)),
+                        string(abi.encodePacked("L1-", nativeL2TknSymbol, version))
+                    )
+                )
+            )
+        );
+        vm.makePersistent(address(RemoteL1Token));
+        vm.makePersistent(address(BadL1Token));
+
+        // Print info
+        console.log("========== ON L1 ==========");
+        console.log("L1Token = MockERC20Owned(%s);", address(L1Token));
+        console.log("BadL1Token = OptimismMintableERC20(%s);", address(BadL1Token));
+        console.log("RemoteL1Token = OptimismMintableERC20(%s);", address(RemoteL1Token));
+
+        console.log("========== ON L2 ==========");
+        console.log("L2Token = OptimismMintableERC20(%s);", address(L2Token));
+        console.log("BadL2Token = OptimismMintableERC20(%s);", address(BadL2Token));
+        console.log("LegacyL2Token = LegacyMintableERC20(%s);", address(LegacyL2Token));
+        console.log("NativeL2Token = MockERC20Owned(%s);", address(NativeL2Token));
+
+        vm.stopBroadcast();
+    }
+}

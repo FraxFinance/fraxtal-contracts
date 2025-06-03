@@ -1,0 +1,12 @@
+// SPDX-License-Identifier: ISC
+pragma solidity ^0.8.0;
+
+import "../BaseTestFraxtalL1Devnet.t.sol";
+
+contract Test_L1StandardBridgeCGT is BaseTestFraxtalL1Devnet {
+    function setUp() public {
+        defaultSetup();
+    }
+
+    // ADD LATER
+}

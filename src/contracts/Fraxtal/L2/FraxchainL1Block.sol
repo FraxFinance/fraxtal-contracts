@@ -1,7 +1,10 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.15;
+pragma solidity ^0.8.0;
 
-import { ISemver } from "@eth-optimism/contracts-bedrock/src/universal/ISemver.sol";
+import { ISemver } from "@eth-optimism/contracts-bedrock/src/universal/interfaces/ISemver.sol";
+import { GasPayingToken, IGasToken } from "@eth-optimism/contracts-bedrock/src/libraries/GasPayingToken.sol";
+import { NotDepositor } from "@eth-optimism/contracts-bedrock/src/libraries/L1BlockErrors.sol";
+import { Constants } from "@eth-optimism/contracts-bedrock/src/libraries/Constants.sol";
 
 /// @custom:proxied
 /// @custom:predeploy 0x4200000000000000000000000000000000000015
@@ -10,8 +13,11 @@ import { ISemver } from "@eth-optimism/contracts-bedrock/src/universal/ISemver.s
 ///         Values within this contract are updated once per epoch (every L1 block) and can only be
 ///         set by the "depositor" account, a special system address. Depositor account transactions
 ///         are created by the protocol whenever we move to a new epoch.
-contract FraxchainL1Block is ISemver {
+contract FraxchainL1Block is ISemver, IGasToken {
+    /// @notice Event emitted when the gas paying token is set.
+    event GasPayingTokenSet(address indexed token, uint8 indexed decimals, bytes32 name, bytes32 symbol);
     /// @notice Address of the special depositor account.
+
     address public constant DEPOSITOR_ACCOUNT = 0xDeaDDEaDDeAdDeAdDEAdDEaddeAddEAdDEAd0001;
 
     /// @notice The latest L1 block number known by the L2 system.
@@ -49,8 +55,8 @@ contract FraxchainL1Block is ISemver {
     /// @notice The latest L1 blob base fee.
     uint256 public blobBaseFee;
 
-    /// @custom:semver 1.2.0
-    string public constant version = "1.2.0";
+    /// @custom:semver 1.5.1-beta.3
+    string public constant version = "1.5.1-beta.3";
 
     /// @notice Reserve extra slots (to a total of 50) in the storage layout for future upgrades of the L1Block contract.
     /// @dev Added by Frax Finance
@@ -64,6 +70,31 @@ contract FraxchainL1Block is ISemver {
     /// @dev Added by Frax Finance
     /// @param blockHash A block hash of a L1 block
     event BlockHashReceived(bytes32 blockHash);
+
+    /// @notice Returns the gas paying token, its decimals, name and symbol.
+    ///         If nothing is set in state, then it means ether is used.
+    function gasPayingToken() public view returns (address addr_, uint8 decimals_) {
+        (addr_, decimals_) = GasPayingToken.getToken();
+    }
+
+    /// @notice Returns the gas paying token name.
+    ///         If nothing is set in state, then it means ether is used.
+    function gasPayingTokenName() public view returns (string memory name_) {
+        name_ = GasPayingToken.getName();
+    }
+
+    /// @notice Returns the gas paying token symbol.
+    ///         If nothing is set in state, then it means ether is used.
+    function gasPayingTokenSymbol() public view returns (string memory symbol_) {
+        symbol_ = GasPayingToken.getSymbol();
+    }
+
+    /// @notice Getter for custom gas token paying networks. Returns true if the
+    ///         network uses a custom gas token.
+    function isCustomGasToken() public view returns (bool) {
+        (address token, ) = gasPayingToken();
+        return token != Constants.ETHER;
+    }
 
     /// @notice Updates the L1 block values.
     /// @param _number         L1 blocknumber.
@@ -122,9 +153,24 @@ contract FraxchainL1Block is ISemver {
     ///   7. _blobBaseFee        L1 blob base fee.
     ///   8. _hash               L1 blockhash.
     ///   9. _batcherHash        Versioned hash to authenticate batcher by.
-    function setL1BlockValuesEcotone() external {
-        bytes32 eventHash = bytes32(keccak256("BlockHashReceived(bytes32)"));
+    function setL1BlockValuesEcotone() public {
+        _setL1BlockValuesEcotone();
+    }
 
+    /// @notice Updates the L1 block values for an Ecotone upgraded chain.
+    /// Params are packed and passed in as raw msg.data instead of ABI to reduce calldata size.
+    /// Params are expected to be in the following order:
+    ///   1. _baseFeeScalar      L1 base fee scalar
+    ///   2. _blobBaseFeeScalar  L1 blob base fee scalar
+    ///   3. _sequenceNumber     Number of L2 blocks since epoch start.
+    ///   4. _timestamp          L1 timestamp.
+    ///   5. _number             L1 blocknumber.
+    ///   6. _basefee            L1 base fee.
+    ///   7. _blobBaseFee        L1 blob base fee.
+    ///   8. _hash               L1 blockhash.
+    ///   9. _batcherHash        Versioned hash to authenticate batcher by.
+    function _setL1BlockValuesEcotone() internal {
+        bytes32 eventHash = bytes32(keccak256("BlockHashReceived(bytes32)"));
         assembly {
             // Revert if the caller is not the depositor account.
             if xor(caller(), DEPOSITOR_ACCOUNT) {
@@ -156,5 +202,16 @@ contract FraxchainL1Block is ISemver {
                 log1(0, 32, eventHash)
             }
         }
+    }
+
+    /// @notice Sets the gas paying token for the L2 system. Can only be called by the special
+    ///         depositor account. This function is not called on every L2 block but instead
+    ///         only called by specially crafted L1 deposit transactions.
+    function setGasPayingToken(address _token, uint8 _decimals, bytes32 _name, bytes32 _symbol) external {
+        if (msg.sender != DEPOSITOR_ACCOUNT) revert NotDepositor();
+
+        GasPayingToken.set({ _token: _token, _decimals: _decimals, _name: _name, _symbol: _symbol });
+
+        emit GasPayingTokenSet({ token: _token, decimals: _decimals, name: _name, symbol: _symbol });
     }
 }

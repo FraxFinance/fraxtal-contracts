@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: ISC
-pragma solidity ^0.8.15;
+pragma solidity ^0.8.0;
 
 import { BaseScript } from "frax-std/BaseScript.sol";
 import { console } from "frax-std/FraxTest.sol";
@@ -56,7 +56,7 @@ contract DeployL1VeFXS is BaseScript {
         _l1veFXS = L1VeFXS(
             deployL1VeFXS({
                 _stateRootOracle: Constants.FraxtalMainnet.FRAXTAL_STATE_ROOT_ORACLE,
-                _proxyAdminOwner: Constants.FraxtalMainnet.FRAXCHAIN_ADMIN, // avoid "admin cannot fallback to proxy target" clash
+                _proxyAdminOwner: Constants.FraxtalMainnet.FRAXTAL_ADMIN_SAFE, // avoid "admin cannot fallback to proxy target" clash
                 _implementationOwner: tempAdmin
             })
         );

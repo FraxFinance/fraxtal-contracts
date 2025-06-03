@@ -33,9 +33,9 @@ pragma solidity >=0.8.0;
  *       maxtime (4 years?)
  */
 /* solhint-disable max-line-length, not-rely-on-time */
-import { ReentrancyGuard } from "@openzeppelin/contracts/security/ReentrancyGuard.sol";
-import { IERC20Metadata } from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
-import { ERC20Burnable } from "@openzeppelin/contracts/token/ERC20/extensions/ERC20Burnable.sol";
+import { ReentrancyGuard } from "@openzeppelin-4/contracts/security/ReentrancyGuard.sol";
+import { IERC20Metadata } from "@openzeppelin-4/contracts/token/ERC20/extensions/IERC20Metadata.sol";
+import { ERC20Burnable } from "@openzeppelin-4/contracts/token/ERC20/extensions/ERC20Burnable.sol";
 import { IveFXSEvents } from "./IveFXSEvents.sol";
 import { IveFXSStructs } from "./IveFXSStructs.sol";
 import { VestedFXSUtils } from "./VestedFXSUtils.sol";
@@ -214,19 +214,23 @@ contract VestedFXS is ReentrancyGuard, IveFXSStructs, IveFXSEvents {
         address _tokenAddr,
         string memory _name,
         string memory _symbol,
-        string memory _version
+        string memory _version,
+        bool _setZerothPointHistory
     ) public {
         // Safety checks - no validation on admin in case this is initialized without admin
         if (_tokenAddr == address(0) || token != address(0)) {
             revert InitializeFailed();
         }
 
+        // Set the admin
         admin = _admin;
 
-        // Initialize the 0th pointHistory
-        pointHistory[0].blk = block.number;
-        pointHistory[0].ts = block.timestamp;
-        pointHistory[0].fxsAmt = 0;
+        // (Optional) Initialize the 0th pointHistory
+        if (_setZerothPointHistory) {
+            pointHistory[0].blk = block.number;
+            pointHistory[0].ts = block.timestamp;
+            pointHistory[0].fxsAmt = 0;
+        }
 
         // Initialize other variables
         name = _name;

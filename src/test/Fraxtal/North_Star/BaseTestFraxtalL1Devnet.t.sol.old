@@ -1,0 +1,413 @@
+// SPDX-License-Identifier: ISC
+pragma solidity ^0.8.0;
+
+import { DeployFraxchainPortal, deploySystemConfig, deployL2OutputOracle } from "src/script/Fraxtal/DeployFraxchainPortal.s.sol";
+import { deployProxyAndInitialize } from "src/script/Fraxtal/DeployProxyAndInitialize.s.sol";
+import { DisputeGameFactory } from "@eth-optimism/contracts-bedrock/src/dispute/DisputeGameFactory.sol";
+import { ERC20 } from "@openzeppelin-4/contracts/token/ERC20/ERC20.sol";
+import { Events } from "@eth-optimism/contracts-bedrock/test/setup/Events.sol";
+import { FFIInterface } from "@eth-optimism/contracts-bedrock/test/setup/FFIInterface.sol";
+import { FaultDisputeGame } from "@eth-optimism/contracts-bedrock/src/dispute/FaultDisputeGame.sol";
+import { FraxTest } from "frax-std/FraxTest.sol";
+import { FraxtalPortal2 } from "src/contracts/Fraxtal/L1/FraxtalPortal2.sol";
+import { Timestamp } from "@eth-optimism/contracts-bedrock/src/dispute/lib/LibUDT.sol";
+import { GameType, GameTypes, OutputRoot, Claim, GameStatus, Hash } from "@eth-optimism/contracts-bedrock/src/dispute/lib/Types.sol";
+import { GasPayingToken } from "@eth-optimism/contracts-bedrock/src/libraries/GasPayingToken.sol";
+import { GasToken } from "src/contracts/Fraxtal/interfaces/GasToken.sol";
+import { ICrossDomainMessenger } from "@eth-optimism/contracts-bedrock/src/universal/interfaces/ICrossDomainMessenger.sol";
+import { IDisputeGame } from "@eth-optimism/contracts-bedrock/src/dispute/interfaces/IDisputeGame.sol";
+import { IFaultDisputeGame } from "@eth-optimism/contracts-bedrock/src/dispute/interfaces/IFaultDisputeGame.sol";
+import { IERC20 } from "@openzeppelin-4/contracts/token/ERC20/IERC20.sol";
+import { IL1Block } from "@eth-optimism/contracts-bedrock/src/L2/interfaces/IL1Block.sol";
+import { IOptimismPortal } from "@eth-optimism/contracts-bedrock/src/L1/interfaces/IOptimismPortal.sol";
+import { OptimismMintableERC20Factory } from "@eth-optimism/contracts-bedrock/src/universal/OptimismMintableERC20Factory.sol";
+import { IProxyAdmin } from "@eth-optimism/contracts-bedrock/src/universal/interfaces/IProxyAdmin.sol";
+import { IResourceMetering } from "@eth-optimism/contracts-bedrock/src/L1/interfaces/IResourceMetering.sol";
+import { ISuperchainConfig } from "@eth-optimism/contracts-bedrock/src/L1/interfaces/ISuperchainConfig.sol";
+import { ISystemConfig } from "@eth-optimism/contracts-bedrock/src/L1/interfaces/ISystemConfig.sol";
+import { Encoding } from "@eth-optimism/contracts-bedrock/src/libraries/Encoding.sol";
+import { Hashing } from "@eth-optimism/contracts-bedrock/src/libraries/Hashing.sol";
+import { L1Block } from "@eth-optimism/contracts-bedrock/src/L2/L1Block.sol";
+import { L1CrossDomainMessenger } from "@eth-optimism/contracts-bedrock/src/L1/L1CrossDomainMessenger.sol";
+import { L2CrossDomainMessenger } from "@eth-optimism/contracts-bedrock/src/L2/L2CrossDomainMessenger.sol";
+import { L1CrossDomainMessengerCGT } from "src/contracts/Fraxtal/L1/L1CrossDomainMessengerCGT.sol";
+import { StandardBridge } from "@eth-optimism/contracts-bedrock/src/universal/StandardBridge.sol";
+import { L1StandardBridge } from "@eth-optimism/contracts-bedrock/src/L1/L1StandardBridge.sol";
+import { L1StandardBridgeCGT } from "src/contracts/Fraxtal/L1/L1StandardBridgeCGT.sol";
+import { L2OutputOracle } from "@eth-optimism/contracts-bedrock/src/L1/L2OutputOracle.sol";
+import { L2ToL1MessagePasser } from "@eth-optimism/contracts-bedrock/src/L2/L2ToL1MessagePasser.sol";
+import { L2StandardBridge } from "@eth-optimism/contracts-bedrock/src/L2/L2StandardBridge.sol";
+import { OptimismPortal } from "@eth-optimism/contracts-bedrock/src/L1/OptimismPortal.sol";
+import { OptimismMintableERC20 } from "@eth-optimism/contracts-bedrock/src/universal/OptimismMintableERC20.sol";
+import { LegacyMintableERC20 } from "@eth-optimism/contracts-bedrock/src/legacy/LegacyMintableERC20.sol";
+import { PermissionedDisputeGame } from "@eth-optimism/contracts-bedrock/src/dispute/PermissionedDisputeGame.sol";
+import { Predeploys } from "@eth-optimism/contracts-bedrock/src/libraries/Predeploys.sol";
+import { Proxy } from "@eth-optimism/contracts-bedrock/src/universal/Proxy.sol";
+import { ProxyAdmin } from "@eth-optimism/contracts-bedrock/src/universal/ProxyAdmin.sol";
+import { SigUtils } from "src/test/Fraxtal/utils/SigUtils.sol";
+import { stdError } from "forge-std/Test.sol";
+import { Storage } from "src/script/Fraxtal/testnet/Storage.sol";
+import { StorageSetterRestricted } from "src/script/Fraxtal/testnet/StorageSetterRestricted.sol";
+import { SystemConfig } from "@eth-optimism/contracts-bedrock/src/L1/SystemConfig.sol";
+import { Types } from "@eth-optimism/contracts-bedrock/src/libraries/Types.sol";
+import { UpgradeDevnetCGT } from "src/script/Fraxtal/North_Star_Hardfork/UpgradeDevnetCGT.s.sol";
+import { VmSafe } from "forge-std/Vm.sol";
+import { console } from "frax-std/FraxTest.sol";
+import "forge-std/StdStorage.sol";
+import "src/Constants.sol" as Constants;
+// import { VmHelper } from "./VmHelper.sol";
+
+contract BaseTestFraxtalL1Devnet is FraxTest, Constants.Helper, Events {
+    // L1 Upgrade Script
+    // =========================================
+    UpgradeDevnetCGT public upgradeScript;
+
+    // Fraxtal-specific
+    // =========================================
+    GasToken public FXS;
+    SigUtils public sigUtils_FXS;
+    ProxyAdmin public proxyAdmin;
+    address public proxyAdminOwner;
+
+    // SystemConfig (proxy)
+    ISystemConfig public systemConfig;
+
+    // SuperchainConfig (proxy)
+    ISuperchainConfig public superchainConfig;
+
+    // Superchain ProxyAdmin
+    IProxyAdmin public superchainProxyAdmin;
+
+    // OptimismPortal FraxtalPortal2
+    Proxy public optimismPortalPxy;
+    address payable public optimismPortalPxyAddress;
+    FraxtalPortal2 public fraxtalPortal2;
+
+    // OptimismMintableERC20Factory (proxy)
+    OptimismMintableERC20Factory public l1OptimismMintableERC20Factory;
+    OptimismMintableERC20Factory public l2OptimismMintableERC20Factory;
+
+    // L1CrossDomainMessenger
+    Proxy public messengerPxy;
+    address payable public messengerPxyAddress;
+    L1CrossDomainMessengerCGT public l1XDomainMsgrCGT;
+
+    // L1StandardBridge
+    Proxy public bridgePxy;
+    address payable public bridgePxyAddress;
+    L1StandardBridgeCGT public l1StandardBridgeCGT;
+
+    // L2toL1MessagePasser (proxy)
+    L2ToL1MessagePasser public l2ToL1MessagePasser;
+
+    // L2StandardBridge (proxy)
+    L2StandardBridge public l2StandardBridge;
+
+    // L2CrossDomainMessenger (proxy)
+    L2CrossDomainMessenger public l2CrossDomainMessenger;
+
+    // L1Block (proxy)
+    L1Block public l1Block;
+
+    // DisputeGameFactory
+    Proxy public disputeGameFactoryPxy;
+    address payable public disputeGameFactoryPxyAddress;
+    DisputeGameFactory public disputeGameFactory;
+
+    // PermissionedDisputeGame
+    PermissionedDisputeGame public gameImpl;
+    address public permissionedDisputeGameImplAddress;
+    address public disputeGameProposer;
+
+    // Misc
+    // =========================================
+    // Forks
+    uint256 initialL1Fork;
+    uint256 initialL2Fork;
+
+    // Test "normal" ERC20s. From Optimism CommonTest
+    ERC20 public L1Token;
+    ERC20 public BadL1Token;
+    OptimismMintableERC20 public L2Token;
+    LegacyMintableERC20 public LegacyL2Token;
+    ERC20 public NativeL2Token;
+    ERC20 public BadL2Token;
+    OptimismMintableERC20 public RemoteL1Token;
+
+    FFIInterface public ffi;
+
+    uint256 public alicePrivateKey;
+    address payable public alice;
+    uint256 public bobPrivateKey;
+    address payable public bob;
+    uint256 public clairePrivateKey;
+    address payable public claire;
+    uint256 public davePrivateKey;
+    address payable public dave;
+    uint256 public ericPrivateKey;
+    address payable public eric;
+    uint256 public frankPrivateKey;
+    address payable public frank;
+
+    function defaultSetup() internal virtual {
+        // Fork L1
+        initialL1Fork = vm.createSelectFork(vm.envString("L1_DEVNET_RPC_URL"));
+
+        // Deploy core contracts
+        // ============================================
+        console.log("<<<Deploy core contracts>>>");
+        upgradeScript = UpgradeDevnetCGT(new UpgradeDevnetCGT());
+
+        // May need to turn on/off if you already upgraded for real
+        upgradeScript.setUp();
+        // upgradeScript.run();
+
+        // Instantiate the deployed contracts
+        FXS = upgradeScript.FXS();
+        sigUtils_FXS = upgradeScript.sigUtils_FXS();
+        proxyAdmin = upgradeScript.proxyAdmin();
+        systemConfig = upgradeScript.systemConfig();
+        superchainConfig = upgradeScript.superchainConfig();
+        superchainProxyAdmin = upgradeScript.superchainProxyAdmin();
+        optimismPortalPxy = upgradeScript.optimismPortalPxy();
+        fraxtalPortal2 = upgradeScript.fraxtalPortal2();
+        messengerPxy = upgradeScript.messengerPxy();
+        l1XDomainMsgrCGT = L1CrossDomainMessengerCGT(address(messengerPxy));
+        bridgePxy = upgradeScript.bridgePxy();
+        l1StandardBridgeCGT = L1StandardBridgeCGT(payable(bridgePxy));
+        disputeGameFactoryPxyAddress = payable(address(systemConfig.disputeGameFactory()));
+        disputeGameFactoryPxy = Proxy(disputeGameFactoryPxyAddress);
+        disputeGameFactory = DisputeGameFactory(disputeGameFactoryPxyAddress);
+        permissionedDisputeGameImplAddress = address(DisputeGameFactory(disputeGameFactoryPxyAddress).gameImpls(GameTypes.PERMISSIONED_CANNON));
+        l1OptimismMintableERC20Factory = OptimismMintableERC20Factory(systemConfig.optimismMintableERC20Factory());
+
+        // Set convenience addresses
+        proxyAdminOwner = upgradeScript.proxyAdminOwner();
+        optimismPortalPxyAddress = upgradeScript.optimismPortalPxyAddress();
+        messengerPxyAddress = upgradeScript.messengerPxyAddress();
+        bridgePxyAddress = upgradeScript.bridgePxyAddress();
+        gameImpl = PermissionedDisputeGame(permissionedDisputeGameImplAddress);
+        disputeGameProposer = gameImpl.proposer();
+
+        // L1 Labels
+        vm.label(address(FXS), "FXS");
+        vm.label(address(systemConfig), "SystemConfigPxy");
+        vm.label(address(superchainConfig), "SuperchainConfigPxy");
+        vm.label(optimismPortalPxyAddress, "FraxtalPortal2Pxy");
+        address _fxtlPrtlImplBefore = proxyAdmin.getProxyImplementation(optimismPortalPxyAddress);
+        vm.label(proxyAdmin.getProxyImplementation(optimismPortalPxyAddress), "FraxtalPortal2Impl");
+        vm.label(messengerPxyAddress, "L1CrossDomainMessengerCGTPxy");
+        vm.label(proxyAdmin.getProxyImplementation(messengerPxyAddress), "L1CrossDomainMessengerImpl");
+        vm.label(bridgePxyAddress, "L1StandardBridgeCGTPxy");
+        vm.label(proxyAdmin.getProxyImplementation(bridgePxyAddress), "L1StandardBridgeImpl");
+        vm.label(disputeGameFactoryPxyAddress, "DisputeGameFactoryPxy");
+        vm.label(proxyAdmin.getProxyImplementation(disputeGameFactoryPxyAddress), "DisputeGameFactoryImpl");
+        vm.label(permissionedDisputeGameImplAddress, "PermissionedDisputeGameImpl");
+
+        // Print the OptimismPortal Proxy admin address
+        // Need to be address(0) here per proxyCallIfNotAdmin
+        // Could also just do proxyAdmin.getProxyAdmin(optimismPortalPxyAddress)
+        hoax(address(0));
+        console.log("OptimismPortal Proxy Admin: ", optimismPortalPxy.admin());
+
+        // Set up test users
+        // ============================================
+        vm.stopPrank();
+
+        // Set up Alice
+        alicePrivateKey = 0xA11CE;
+        alice = payable(vm.addr(alicePrivateKey));
+        vm.label(alice, "Alice");
+
+        // Set up Bob
+        bobPrivateKey = 0xB0B;
+        bob = payable(vm.addr(bobPrivateKey));
+        vm.label(bob, "Bob");
+
+        // Set up Claire
+        clairePrivateKey = 0xc0;
+        claire = payable(vm.addr(clairePrivateKey));
+        vm.label(claire, "Claire");
+
+        // Set up Dave
+        davePrivateKey = 0xDa;
+        dave = payable(vm.addr(davePrivateKey));
+        vm.label(dave, "Dave");
+
+        // Set up Eric
+        ericPrivateKey = 0xe0;
+        eric = payable(vm.addr(ericPrivateKey));
+        vm.label(eric, "Eric");
+
+        // Set up Frank
+        frankPrivateKey = 0xf0;
+        frank = payable(vm.addr(frankPrivateKey));
+        vm.label(frank, "Frank");
+
+        // Give Alice some FXS
+        hoax(FXS.owner());
+        FXS.mint(alice, 100_000e18);
+
+        ffi = new FFIInterface();
+
+        // Make L1 contracts persistent before forking
+        vm.makePersistent(alice, bob, claire);
+        vm.makePersistent(dave, eric, frank);
+        vm.makePersistent(address(FXS), address(ffi));
+        vm.makePersistent(address(systemConfig), address(superchainConfig));
+        vm.makePersistent(optimismPortalPxyAddress, messengerPxyAddress, bridgePxyAddress);
+        vm.makePersistent(_fxtlPrtlImplBefore, disputeGameFactoryPxyAddress, permissionedDisputeGameImplAddress);
+
+        // Fork L2 and set instances
+        initialL2Fork = vm.createSelectFork(vm.envString("L2_DEVNET_RPC_URL"));
+        l2ToL1MessagePasser = L2ToL1MessagePasser(payable(Predeploys.L2_TO_L1_MESSAGE_PASSER));
+        l2StandardBridge = L2StandardBridge(payable(Predeploys.L2_STANDARD_BRIDGE));
+        l2OptimismMintableERC20Factory = OptimismMintableERC20Factory(payable(Predeploys.OPTIMISM_MINTABLE_ERC20_FACTORY));
+        l2CrossDomainMessenger = L2CrossDomainMessenger(Predeploys.L2_CROSS_DOMAIN_MESSENGER);
+        l1Block = L1Block(Predeploys.L1_BLOCK_ATTRIBUTES);
+
+        // Make L2 contracts persistent before forking back
+        vm.makePersistent(address(l2ToL1MessagePasser), address(l2StandardBridge), address(l2OptimismMintableERC20Factory));
+        vm.makePersistent(address(l2CrossDomainMessenger), address(l1Block));
+
+        // L2 labels
+        vm.label(address(l2ToL1MessagePasser), "L2ToL1MessagePasser");
+        vm.label(address(l2StandardBridge), "L2StandardBridge");
+        vm.label(address(l2OptimismMintableERC20Factory), "OptimismMintableERC20Factory");
+        vm.label(address(l2CrossDomainMessenger), "L2CrossDomainMessenger");
+        vm.label(address(l1Block), "L1Block");
+
+        // Go back to L1
+        vm.selectFork(initialL1Fork);
+
+        // Setup more test tokens, then go back to L1
+        bridgeInitializerSetUp();
+
+        // Make sure nothing changed
+        address _fxtlPrtlImplAfter = proxyAdmin.getProxyImplementation(optimismPortalPxyAddress);
+        assertEq(_fxtlPrtlImplBefore, _fxtlPrtlImplAfter, "FraxtalPortal2 impl mismatch after forking");
+    }
+
+    // Pasted from contracts-bedrock/src/test/CommonTest.t.sol:FFIInterface:getProveWithdrawalTransactionInputs
+    function ffiGetProveWithdrawalTransactionInputs(Types.WithdrawalTransaction memory _tx) public returns (bytes32, bytes32, bytes32, bytes32, bytes[] memory) {
+        string[] memory cmds = new string[](8);
+        cmds[0] = "./scripts/go/bin/differential-testing";
+        cmds[1] = "getProveWithdrawalTransactionInputs";
+        cmds[2] = vm.toString(_tx.nonce);
+        cmds[3] = vm.toString(_tx.sender);
+        cmds[4] = vm.toString(_tx.target);
+        cmds[5] = vm.toString(_tx.value);
+        cmds[6] = vm.toString(_tx.gasLimit);
+        cmds[7] = vm.toString(_tx.data);
+
+        // Example
+        // go ./scripts/go/differential-testing.go 0 0xe05fcC23807536bEe418f142D19fa0d21BB0cfF7 0x0376AAc07Ad725E01357B1725B5ceC61aE10473c 100 100000 0x
+
+        bytes memory result = vm.ffi(cmds);
+        (bytes32 stateRoot, bytes32 storageRoot, bytes32 outputRoot, bytes32 withdrawalHash, bytes[] memory withdrawalProof) = abi.decode(result, (bytes32, bytes32, bytes32, bytes32, bytes[]));
+
+        return (stateRoot, storageRoot, outputRoot, withdrawalHash, withdrawalProof);
+    }
+
+    // See https://github.com/ethereum-optimism/optimism/blob/b2f662873a97eb6748b62295ce35700f59a3db19/packages/contracts-bedrock/test/invariants/OptimismPortal2.t.sol#L175
+    // Uses DisputeGame vs L2OutputOracle
+    function proveWithdrawalTransaction(Types.WithdrawalTransaction memory _tx) public returns (bytes32 _withdrawalHash) {
+        uint256 _proposedGameIndex;
+        uint256 _proposedBlockNumber;
+        bytes32 _stateRoot;
+        bytes32 _storageRoot;
+        bytes32 _outputRoot;
+        bytes32 _withdrawalHash;
+        bytes[] memory _withdrawalProof;
+        Types.OutputRootProof memory _outputRootProof;
+
+        // Get withdrawal proof data
+        (_stateRoot, _storageRoot, _outputRoot, _withdrawalHash, _withdrawalProof) = ffiGetProveWithdrawalTransactionInputs(_tx);
+
+        // Setup a dummy output root proof
+        _outputRootProof = Types.OutputRootProof({ version: bytes32(uint256(0)), stateRoot: _stateRoot, messagePasserStorageRoot: _storageRoot, latestBlockhash: bytes32(uint256(0)) });
+
+        // Create a dispute game with the output root we've proposed.
+        _proposedBlockNumber = block.number + 25;
+
+        // Use the PermissionedDisputeGame here instead of a normal DisputeGame
+        // https://github.com/ethereum-optimism/optimism/blob/b2f662873a97eb6748b62295ce35700f59a3db19/packages/contracts-bedrock/test/dispute/PermissionedDisputeGame.t.sol#L21
+        PermissionedDisputeGame gameClone;
+        {
+            // Need to prank tx.origin here too
+            vm.startPrank(disputeGameProposer, disputeGameProposer);
+            gameClone = PermissionedDisputeGame(payable(address(DisputeGameFactory(disputeGameFactoryPxyAddress).create(FraxtalPortal2(optimismPortalPxyAddress).respectedGameType(), Claim.wrap(_outputRoot), abi.encode(_proposedBlockNumber)))));
+            vm.stopPrank();
+        }
+        // For non-permissioned DisputeGames
+        // {
+        //     FaultDisputeGame gameClone = FaultDisputeGame(
+        //         payable(
+        //             address(
+        //                 DisputeGameFactory(disputeGameFactoryPxyAddress).create(
+        //                     FraxtalPortal2(optimismPortalPxyAddress).respectedGameType(), Claim.wrap(_outputRoot), abi.encode(_proposedBlockNumber)
+        //                 )
+        //             )
+        //         )
+        //     );
+        // }
+
+        // Warp beyond the finalization period for the dispute game and resolve it.
+        vm.warp(block.timestamp + (gameClone.maxClockDuration().raw() * 2) + 1 seconds);
+        gameClone.resolveClaim(0, 0);
+        gameClone.resolve();
+        _proposedGameIndex = DisputeGameFactory(disputeGameFactoryPxyAddress).gameCount() - 1;
+
+        // Do the withdrawal
+        vm.expectEmit(true, true, true, true);
+        emit WithdrawalProven(_withdrawalHash, _tx.sender, _tx.target);
+        FraxtalPortal2(optimismPortalPxyAddress).proveWithdrawalTransaction(_tx, _proposedGameIndex, _outputRootProof, _withdrawalProof);
+    }
+
+    /// @dev Helper function that wraps `TransactionDeposited` event.
+    ///      The magic `0` is the version.
+    function emitTransactionDeposited(address _from, address _to, uint256 _mint, uint256 _value, uint64 _gasLimit, bool _isCreation, bytes memory _data) internal {
+        emit TransactionDeposited(_from, _to, 0, abi.encodePacked(_mint, _value, _gasLimit, _isCreation, _data));
+    }
+
+    /// From Optimism CommonTest
+    function bridgeInitializerSetUp() public {
+        // On L1
+        // =========================================
+        L1Token = new ERC20("Native L1 Token", "L1T");
+        vm.makePersistent(address(L1Token));
+
+        // On L2
+        // =========================================
+        vm.selectFork(initialL2Fork);
+
+        LegacyL2Token = new LegacyMintableERC20({ _l2Bridge: address(l2StandardBridge), _l1Token: address(L1Token), _name: string.concat("LegacyL2-", L1Token.name()), _symbol: string.concat("LegacyL2-", L1Token.symbol()) });
+        vm.label(address(LegacyL2Token), "LegacyMintableERC20");
+        vm.makePersistent(address(LegacyL2Token));
+
+        // Deploy the L2 ERC20 now
+        L2Token = OptimismMintableERC20(l2OptimismMintableERC20Factory.createStandardL2Token(address(L1Token), string(abi.encodePacked("L2-", L1Token.name())), string(abi.encodePacked("L2-", L1Token.symbol()))));
+        vm.makePersistent(address(L2Token));
+
+        BadL2Token = ERC20(address(OptimismMintableERC20(l2OptimismMintableERC20Factory.createStandardL2Token(address(1), string(abi.encodePacked("L2-", L1Token.name())), string(abi.encodePacked("L2-", L1Token.symbol()))))));
+        vm.makePersistent(address(BadL2Token));
+
+        NativeL2Token = new ERC20("Native L2 Token", "L2T");
+        vm.makePersistent(address(NativeL2Token));
+
+        // Back to L1
+        // =========================================
+        vm.selectFork(initialL1Fork);
+
+        RemoteL1Token = OptimismMintableERC20(l1OptimismMintableERC20Factory.createStandardL2Token(address(NativeL2Token), string(abi.encodePacked("L1-", NativeL2Token.name())), string(abi.encodePacked("L1-", NativeL2Token.symbol()))));
+        vm.makePersistent(address(RemoteL1Token));
+
+        BadL1Token = ERC20(address(OptimismMintableERC20(l1OptimismMintableERC20Factory.createStandardL2Token(address(1), string(abi.encodePacked("L1-", NativeL2Token.name())), string(abi.encodePacked("L1-", NativeL2Token.symbol()))))));
+        vm.makePersistent(address(BadL1Token));
+    }
+
+    function _warpToAndRollOne(uint256 _newTs) public {
+        vm.warp(_newTs);
+        vm.roll(block.number + 1);
+    }
+}

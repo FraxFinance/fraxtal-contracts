@@ -4,12 +4,16 @@ var __createBinding =
   (Object.create
     ? function (o, m, k, k2) {
         if (k2 === undefined) k2 = k;
-        Object.defineProperty(o, k2, {
-          enumerable: true,
-          get: function () {
-            return m[k];
-          },
-        });
+        var desc = Object.getOwnPropertyDescriptor(m, k);
+        if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
+          desc = {
+            enumerable: true,
+            get: function () {
+              return m[k];
+            },
+          };
+        }
+        Object.defineProperty(o, k2, desc);
       }
     : function (o, m, k, k2) {
         if (k2 === undefined) k2 = k;
@@ -36,18 +40,22 @@ var __importStar =
     return result;
   };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.FraxchainMainnet =
-  exports.FraxchainTestnet =
-  exports.FraxchainL2Devnet =
-  exports.FraxchainL1Devnet =
-  exports.FraxchainDeployment =
+exports.FraxtalMainnet =
+  exports.FraxtalTestnetSepolia =
+  exports.FraxtalTestnet =
+  exports.FraxtalL2Devnet =
+  exports.FraxtalL1Devnet =
+  exports.FraxtalDeployment =
+  exports.Sepolia =
   exports.Holesky =
   exports.Mainnet =
     void 0;
 exports.Mainnet = __importStar(require("./mainnet"));
 exports.Holesky = __importStar(require("./holesky"));
-exports.FraxchainDeployment = __importStar(require("./fraxchain-deployments"));
-exports.FraxchainL1Devnet = __importStar(require("./fraxchain-devnet-l1"));
-exports.FraxchainL2Devnet = __importStar(require("./fraxchain-devnet-l2"));
-exports.FraxchainTestnet = __importStar(require("./fraxchain-testnet"));
-exports.FraxchainMainnet = __importStar(require("./fraxchain-mainnet"));
+exports.Sepolia = __importStar(require("./sepolia"));
+exports.FraxtalDeployment = __importStar(require("./fraxtal-deployments"));
+exports.FraxtalL1Devnet = __importStar(require("./fraxtal-devnet-l1"));
+exports.FraxtalL2Devnet = __importStar(require("./fraxtal-devnet-l2"));
+exports.FraxtalTestnet = __importStar(require("./fraxtal-testnet"));
+exports.FraxtalTestnetSepolia = __importStar(require("./fraxtal-testnet-sepolia"));
+exports.FraxtalMainnet = __importStar(require("./fraxtal-mainnet"));

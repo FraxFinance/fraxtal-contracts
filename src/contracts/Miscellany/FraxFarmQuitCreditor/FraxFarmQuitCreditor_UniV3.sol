@@ -24,11 +24,11 @@ pragma solidity >=0.8.0;
 // Carter Carlson: https://github.com/pegahcarter
 // Thomas Clement: https://github.com/tom2o17
 
-import { SafeERC20 } from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
-import { IERC20Metadata } from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
+import { SafeERC20 } from "@openzeppelin-4/contracts/token/ERC20/utils/SafeERC20.sol";
+import { IERC20Metadata } from "@openzeppelin-4/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 import { INonfungiblePositionManager, IFraxFarmUniV3 } from "./Imports.sol";
 import { OwnedV2 } from "src/contracts/Miscellany/OwnedV2.sol";
-import { ReentrancyGuard } from "@openzeppelin/contracts/security/ReentrancyGuard.sol";
+import { ReentrancyGuard } from "@openzeppelin-4/contracts/security/ReentrancyGuard.sol";
 import { IL1CrossDomainMessenger } from "./IL1CrossDomainMessenger.sol";
 import { L1QuitCreditorReceiverConverter } from "./L1QuitCreditorReceiverConverter.sol";
 

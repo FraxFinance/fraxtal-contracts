@@ -5,9 +5,11 @@ import { BaseTestMisc } from "../BaseTestMisc.t.sol";
 import { FraxtalERC4626MintRedeemer } from "src/contracts/Miscellany/FraxtalERC4626MintRedeemer.sol";
 import { MintableBurnableTestERC20 } from "src/test/VestedFXS-and-Flox/helpers/MintableBurnableTestERC20.sol";
 import { OwnedV2AutoMsgSender } from "src/contracts/VestedFXS-and-Flox/VestedFXS/OwnedV2AutoMsgSender.sol";
+import { UpgradeSfraxMintRedeemer } from "src/script/Miscellany/UpgradeSfraxMintRedeemer.s.sol";
+import { Proxy } from "src/script/Miscellany/Proxy.sol";
 import { console } from "frax-std/FraxTest.sol";
 import "forge-std/console2.sol";
-import { Math } from "@openzeppelin/contracts/utils/math/Math.sol";
+import { Math } from "@openzeppelin-4/contracts/utils/math/Math.sol";
 
 contract Unit_Test_sFRAXRedeemer is BaseTestMisc {
     uint256 fee;
@@ -91,7 +93,7 @@ contract Unit_Test_sFRAXRedeemer is BaseTestMisc {
         (_maxAssetsDepositable, _maxSharesMintable, _maxAssetsWithdrawable, _maxSharesRedeemable) = sfraxMintRedeemer.mdwrComboView();
 
         // Check
-        assertEq(_maxAssetsDepositable, 1040e18 + Math.mulDiv(fee, 1040e18, 1e18, Math.Rounding.Up), "[MDWR]: Final _maxAssetsDepositable");
+        assertEq(_maxAssetsDepositable, Math.mulDiv(1040e18, 1e18, (1e18 - fee), Math.Rounding.Up), "[MDWR]: Final _maxAssetsDepositable");
         assertEq(_maxSharesMintable, 1000e18, "[MDWR]: Final _maxSharesMintable");
         assertEq(_maxAssetsWithdrawable, 1000e18, "[MDWR]: Final _maxAssetsWithdrawable");
         // 1000 / 1.04 = ~961.538
@@ -324,14 +326,75 @@ contract Unit_Test_sFRAXRedeemer is BaseTestMisc {
         assertEq({ a: 1.06e18, b: price, err: "// NOTICE: User should not be able to front and back run oracle update" });
     }
 
+    function _previewDepositMintWithdrawRedeem() internal {
+        frax.mint(address(sfraxMintRedeemer), 100_000e18);
+        sfrax.mint(address(sfraxMintRedeemer), 100_000e18);
+
+        // Set fee to 1%
+        sfraxMintRedeemer.setMintRedeemFee(0.01e18);
+
+        // // Set fee to 0.01%
+        // sfraxMintRedeemer.setMintRedeemFee(0.0001e18);
+
+        // // Set fee to 0%
+        // sfraxMintRedeemer.setMintRedeemFee(0.00e18);
+
+        // Impersonate Bob
+        vm.startPrank(bob);
+
+        // Approve FRAX to the sfraxMintRedeemer
+        frax.approve(address(sfraxMintRedeemer), 4e18);
+
+        // Do Deposit -> Mint first
+        console.log("\n----- Common Info -----");
+        console.log("getLatestUnderlyingPriceE18: ", sfraxMintRedeemer.getLatestUnderlyingPriceE18());
+        console.log("getVaultTknPriceStoredE18: ", sfraxMintRedeemer.getVaultTknPriceStoredE18());
+
+        // Do Deposit -> Mint first
+        console.log("\n----- Deposit / Mint -----");
+
+        // preview Deposit
+        uint256 _sharesOutPreview = sfraxMintRedeemer.previewDeposit(1e18);
+        console.log("previewDeposit _sharesOutPreview: ", _sharesOutPreview);
+
+        // previewMint using previewDeposit result
+        uint256 _assetsInPreview = sfraxMintRedeemer.previewMint(_sharesOutPreview);
+        console.log("previewMint _assetsInPreview: ", _assetsInPreview);
+
+        // Check
+        assertEq(_assetsInPreview, 1e18, "Deposit / Mint reciprocal amounts mismatch");
+
+        // Now do Withdraw / Redeem
+        console.log("\n----- Withdraw / Redeem -----");
+
+        // preview Withdraw
+        uint256 _sharesInPreview = sfraxMintRedeemer.previewWithdraw(1e18);
+        console.log("previewWithdraw _sharesInPreview: ", _sharesInPreview);
+
+        // preview Redeem
+        uint256 _assetsOutPreview = sfraxMintRedeemer.previewRedeem(_sharesInPreview);
+        console.log("previewRedeem _assetsOutPreview: ", _assetsOutPreview);
+
+        // Check. Can be off by 1 wei
+        assertApproxEqRel(_assetsOutPreview, 1e18, 1 wei, "Withdraw / Redeem reciprocal amounts mismatch");
+
+        vm.stopPrank();
+    }
+
+    function test_previewDepositMintWithdrawRedeem() public {
+        sFraxRedeemerSetup();
+        _previewDepositMintWithdrawRedeem();
+    }
+
     function test_feeOn_Deposit() public {
         sFraxRedeemerSetup();
         frax.mint(address(sfraxMintRedeemer), 100_000e18);
         sfrax.mint(address(sfraxMintRedeemer), 100_000e18);
+        uint256 fee = sfraxMintRedeemer.fee();
 
         (uint256 sFraxReceived, uint256 price) = _depositAndLogBob();
 
-        uint256 _assetsInPostFee = 10e18 - Math.mulDiv(10e18, sfraxMintRedeemer.fee(), 1e18, Math.Rounding.Up);
+        uint256 _assetsInPostFee = 10e18 - Math.mulDiv(10e18, fee, 1e18, Math.Rounding.Up);
         uint256 _expectedReceived = Math.mulDiv(_assetsInPostFee, 1e18, price, Math.Rounding.Down);
 
         console.log("Assets in including Fees: ", _assetsInPostFee);
@@ -344,6 +407,7 @@ contract Unit_Test_sFRAXRedeemer is BaseTestMisc {
         sFraxRedeemerSetup();
         frax.mint(address(sfraxMintRedeemer), 100_000e18);
         sfrax.mint(address(sfraxMintRedeemer), 100_000e18);
+        uint256 fee = sfraxMintRedeemer.fee();
 
         uint256 toApprove = sfraxMintRedeemer.previewMint(10e18);
         uint256 fraxBefore = frax.balanceOf(bob);
@@ -355,7 +419,7 @@ contract Unit_Test_sFRAXRedeemer is BaseTestMisc {
         uint256 fraxAfter = frax.balanceOf(bob);
 
         uint256 assetIn = Math.mulDiv(10e18, sfraxMintRedeemer.getVaultTknPriceStoredE18(), 1e18, Math.Rounding.Up);
-        assetIn += Math.mulDiv(assetIn, 1e11, 1e18, Math.Rounding.Up);
+        assetIn = Math.mulDiv(assetIn, 1e18, (1e18 - fee), Math.Rounding.Up);
 
         assertEq({ a: fraxBefore - fraxAfter, b: fraxOwed, err: "// THEN: return is not eq to state change" });
 
@@ -367,6 +431,7 @@ contract Unit_Test_sFRAXRedeemer is BaseTestMisc {
     function test_feeOn_Redeem() public {
         test_feeOn_Mint();
         uint256 fraxBefore = frax.balanceOf(bob);
+        uint256 fee = sfraxMintRedeemer.fee();
 
         /// @notice prank on `bob` still active
         sfrax.approve(sfxMRAddress, 10e18);
@@ -374,8 +439,8 @@ contract Unit_Test_sFRAXRedeemer is BaseTestMisc {
 
         uint256 fraxAfter = frax.balanceOf(bob);
 
-        uint256 assetOut = Math.mulDiv(10e18, sfraxMintRedeemer.getVaultTknPriceStoredE18(), 1e18, Math.Rounding.Up);
-        assetOut -= Math.mulDiv(assetOut, 1e11, 1e18, Math.Rounding.Up);
+        uint256 assetOut = Math.mulDiv(10e18, sfraxMintRedeemer.getVaultTknPriceStoredE18(), 1e18, Math.Rounding.Down);
+        assetOut = Math.mulDiv((1e18 - fee), assetOut, 1e18, Math.Rounding.Up);
 
         assertEq({ a: fraxOwed, b: fraxAfter - fraxBefore, err: "// THEN: return is not eq to state change" });
 
@@ -385,6 +450,7 @@ contract Unit_Test_sFRAXRedeemer is BaseTestMisc {
     function test_feeOn_Withdraw() public {
         test_feeOn_Mint();
         uint256 sfraxBefore = sfrax.balanceOf(bob);
+        uint256 fee = sfraxMintRedeemer.fee();
 
         /// @notice prank on `bob` still active
         sfrax.approve(sfxMRAddress, 10e18);
@@ -394,7 +460,7 @@ contract Unit_Test_sFRAXRedeemer is BaseTestMisc {
 
         assertEq({ a: sfraxIn, b: sfraxBefore - sfraxAfter, err: "// THEN: return is not eq to state change" });
 
-        uint256 assetOutWithFee = 10e18 + Math.mulDiv(10e18, 1e11, 1e18, Math.Rounding.Up);
+        uint256 assetOutWithFee = Math.mulDiv(10e18, 1e18, (1e18 - fee), Math.Rounding.Up);
         uint256 sharedIn = Math.mulDiv(assetOutWithFee, 1e18, sfraxMintRedeemer.getVaultTknPriceStoredE18(), Math.Rounding.Up);
 
         assertEq({ a: sfraxIn, b: sharedIn, err: "// THEN: fees not factored as expected" });

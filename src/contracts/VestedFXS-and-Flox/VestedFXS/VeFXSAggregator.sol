@@ -40,8 +40,8 @@ import { FPISLockerUtils } from "../FPISLocker/FPISLockerUtils.sol";
 import { IlFPISStructs } from "../FPISLocker/IlFPISStructs.sol";
 import { IveFXSStructs } from "./IveFXSStructs.sol";
 import { TransferHelper } from "../Flox/TransferHelper.sol";
-import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
-import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import "@openzeppelin-4/contracts/token/ERC20/ERC20.sol";
+import "@openzeppelin-4/contracts/token/ERC20/utils/SafeERC20.sol";
 import { OwnedV2AutoMsgSender } from "./OwnedV2AutoMsgSender.sol";
 
 // import "forge-std/console2.sol";
@@ -184,12 +184,12 @@ contract VeFXSAggregator is OwnedV2AutoMsgSender, IveFXSStructs {
 
     /// @notice Returns the name
     function name() public view returns (string memory) {
-        return "Vested FXS";
+        return "Vested FRAX";
     }
 
     /// @notice Returns the symbol
     function symbol() public view returns (string memory) {
-        return "veFXS";
+        return "veFRAX";
     }
 
     /// @notice Total veFXS of a user from multiple different sources, such as the FPIS Locker, L1VeFXS, and Fraxtal veFXS

@@ -1,0 +1,394 @@
+// SPDX-License-Identifier: UNLICENSED
+pragma solidity ^0.8.0;
+
+import "./UpgradeDevnetCGT.s.sol";
+import { Duration } from "@eth-optimism/contracts-bedrock/src/dispute/lib/Types.sol";
+
+contract L1TestTxs is UpgradeDevnetCGT {
+    IFaultDisputeGame game;
+    uint256 _proposedGameIndex;
+    uint256 _proposedBlockNumber;
+    bytes32 _stateRoot;
+    bytes32 _storageRoot;
+    bytes32 _outputRoot;
+    bytes32 _withdrawalHash;
+    bytes[] _withdrawalProof;
+    Types.OutputRootProof internal _outputRootProof;
+
+    // Events
+    event WithdrawalProven(bytes32 indexed withdrawalHash, address indexed from, address indexed to);
+
+    // Owner of the test tokens
+    address public testTokenOwner = vm.addr(gameProposerPk);
+
+    function setUp() public override {
+        super.setUp();
+    }
+
+    function run() public override {
+        vm.startBroadcast();
+
+        // Print some addresses
+        for (uint32 i = 0; i < 15; i++) {
+            // Get the address
+            address _addr = vm.addr(vm.deriveKey(mnemonic, "m/44'/60'/2'/2151908/", i));
+
+            // Print the info
+            console.log("[%s]: %s", i, _addr);
+        }
+        console.log("disputeGameProposer: ", disputeGameProposer);
+
+        // Optional L2 prep calls
+        if (false) {
+            // Move to L2 and broadcast with the token owner
+            vm.stopBroadcast();
+            vm.createSelectFork(vm.rpcUrl("l2_devnet"), 2_558_198);
+            vm.startBroadcast(gameProposerPk);
+        }
+
+        // L1 GAS ERC20 -> L2 GAS gas token
+        // L1 FraxtalPortal2.depositERC20Transaction -> L2 (sequencer mints directly)
+        // -------------------------------------------------------------------------
+        // [X] WORKS
+        // L1: http://localhost:36103/tx/0x32d7f2f9f06446842951e87c2ae5f8daeef9fbfac7adf143360522c2a08e066f
+        // L2: http://localhost:33286/tx/0xbe6716916d8c9b7384773cebbe5ca6cf7f55fe0b0ffceff86c0cdfe021a9cad5
+        if (false) {
+            // Approve GAS to the FraxtalPortal2
+            FXS.approve(address(fraxtalPortal2), 15e18);
+
+            // Deposit GAS to the FraxtalPortal2
+            fraxtalPortal2.depositERC20Transaction(testerAddress, 15e18, 0, 200_000, false, hex"123456");
+        }
+
+        // L1 Native ERC20 -> L2 Bridged/IOU ERC20
+        // L1 L1StandardBridge.bridgeERC20 -> L2 CrossDomainMessager (at first) -> L2 L2StandardBridge
+        // -------------------------------------------------------------------------
+        // [X] WORKS
+        // L1: http://localhost:36103/tx/0x4082071889bb5fda09c50edf671c52a659e79d29148dfc28540eb81759ff91bc
+        // L2: http://localhost:33286/tx/0xfc92c228971c5741df64af73cd0137c7946e72e509f4a4cfe6d1ce697f999953
+        if (false) {
+            // Approve L1Token to the L1StandardBridge
+            L1Token.approve(address(l1StandardBridgeCGT), 1e18);
+
+            // Deposit L1Token to the L1StandardBridge
+            l1StandardBridgeCGT.bridgeERC20(address(L1Token), address(L2Token), 1e18, 200_000, hex"123456");
+        }
+
+        // L1 Bridged/IOU ERC20 -> L2 Native ERC20
+        // !!! IMPORTANT: MAKE SURE TO DO L2 -> L1 FIRST OR ELSE YOU WILL REVERT FOR NOT HAVING ANY TOKENS ON L1 !!!
+        // -------------------------------------------------------------------------
+        // []
+        // L1:
+        // L2:
+        if (false) {
+            // Approve RemoteL1Token to the L1StandardBridge
+            RemoteL1Token.approve(address(l1StandardBridgeCGT), 1e18);
+
+            // Deposit RemoteL1Token to the L1StandardBridge
+            l1StandardBridgeCGT.bridgeERC20(address(RemoteL1Token), address(NativeL2Token), 1e18, 200_000, hex"123456");
+        }
+
+        // L2 Native ERC20 -> L1 Bridged/IOU ERC20
+        // L2 l2StandardBridge.bridgeERC20To -> L1 L1StandardBridge ???
+        // -------------------------------------------------------------------------
+        // [] PENDING, Called On Jan 20 ~6PM PST. ETA ~ Jan 24 @ 6PM PST
+        // L1 (proof):
+        // L1 (withdrawal):
+        // L1 gameClone: 0xC182Ca34E2d22911426dB7CBE4F35Df55606cdfc
+        // L2: http://localhost:33286/tx/0xdbb13d12dd352ddc520dd0678b16a25b6949779bba6f2efa695e508621c57ea2
+        if (false) {
+            // Initial
+            if (false) {
+                // Move to L2
+                vm.stopBroadcast();
+                vm.createSelectFork(vm.rpcUrl("l2_devnet"));
+                vm.startBroadcast();
+
+                // Approve NativeL2Token to the L2StandardBridge
+                NativeL2Token.approve(address(l2StandardBridge), 3e18);
+
+                uint256 _nonce = l2ToL1MessagePasser.messageNonce(); // Uses Encoding.encodeVersionedNonce(_nonce, _version);
+                console.log("_nonce: ", _nonce);
+
+                // Initiate withdrawal
+                l2StandardBridge.bridgeERC20To(
+                    address(NativeL2Token),
+                    address(RemoteL1Token),
+                    testerAddress,
+                    3e18,
+                    200_000,
+                    hex"123456"
+                );
+            }
+
+            // Create the dispute game and withdraw (multiple steps)
+            if (true) {
+                // Get the nonce by looking manually at the tx log, then going to
+                // https://www.rapidtables.com/convert/number/hex-to-decimal.html
+                // to get the integer value
+                // uint256 _nonce = 1_196_399_822_864_866_582_922_313_804_063_091_419_624_415_988_956_024_291_569_705_133_770_662_039_636;
+                // OR paste from above
+                uint256 _nonce = 1_766_847_064_778_384_329_583_297_500_742_918_515_827_483_896_875_618_958_121_606_201_292_619_777;
+
+                Types.WithdrawalTransaction memory _tx = Types.WithdrawalTransaction({
+                    nonce: _nonce,
+                    sender: testerAddress,
+                    target: testerAddress,
+                    value: 3e18,
+                    gasLimit: 200_000,
+                    data: hex"123456"
+                });
+
+                // Get modified proof inputs.
+                (
+                    _stateRoot,
+                    _storageRoot,
+                    _outputRoot,
+                    _withdrawalHash,
+                    _withdrawalProof
+                ) = ffiGetProveWithdrawalTransactionInputs(_tx);
+                _outputRootProof = Types.OutputRootProof({
+                    version: bytes32(0),
+                    stateRoot: _stateRoot,
+                    messagePasserStorageRoot: _storageRoot,
+                    latestBlockhash: bytes32(0)
+                });
+
+                // Ensure the values returned from ffi are correct
+                assert(_outputRoot == Hashing.hashOutputRootProof(_outputRootProof));
+                assert(_withdrawalHash == Hashing.hashWithdrawal(_tx));
+
+                // Create the dispute game
+                if (false) {
+                    // Create a dispute game with the output root we've proposed.
+                    _proposedBlockNumber = block.number + 25;
+
+                    // Do the dispute game
+                    PermissionedDisputeGame gameClone;
+                    {
+                        vm.stopBroadcast();
+                        vm.startBroadcast(gameProposerPk);
+
+                        // Create the game
+                        gameClone = PermissionedDisputeGame(
+                            payable(
+                                address(
+                                    DisputeGameFactory(disputeGameFactoryPxyAddress).create(
+                                        FraxtalPortal2(optimismPortalPxyAddress).respectedGameType(),
+                                        Claim.wrap(_outputRoot),
+                                        abi.encode(_proposedBlockNumber)
+                                    )
+                                )
+                            )
+                        );
+                        console.log("gameClone: ", address(gameClone));
+                    }
+                }
+
+                // Resolve the claim and prove the withdrawal
+                if (true) {
+                    // Instantiate the game
+                    PermissionedDisputeGame gameClone = PermissionedDisputeGame(
+                        0xC182Ca34E2d22911426dB7CBE4F35Df55606cdfc
+                    );
+
+                    // Broadcast as the game proposer
+                    vm.stopBroadcast();
+                    vm.startBroadcast(gameProposerPk);
+
+                    // Get the time left for the claim
+                    uint256 _claimIndex = 0;
+                    {
+                        int64 _cld = int64(Duration(gameClone.getChallengerDuration(_claimIndex)).raw());
+                        int64 _maxClock = int64(Duration(gameClone.maxClockDuration()).raw());
+                        console.log("getChallengerDuration: ", _cld);
+                        console.log("MAX_CLOCK_DURATION: ", _maxClock);
+                        console.log("Time left: ", _maxClock - _cld);
+                    }
+
+                    // Resolve the claim
+                    gameClone.resolveClaim(_claimIndex, 0);
+                    gameClone.resolve();
+                    _proposedGameIndex = DisputeGameFactory(disputeGameFactoryPxyAddress).gameCount() - 1;
+
+                    // Switch back to the test user
+                    vm.stopBroadcast();
+                    vm.startBroadcast(vm.envUint("PK"));
+
+                    // Do the withdrawal
+                    vm.expectEmit(true, true, true, true);
+                    emit WithdrawalProven(_withdrawalHash, _tx.sender, _tx.target);
+                    FraxtalPortal2(optimismPortalPxyAddress).proveWithdrawalTransaction(
+                        _tx,
+                        _proposedGameIndex,
+                        _outputRootProof,
+                        _withdrawalProof
+                    );
+                }
+            }
+        }
+
+        // L2 Bridged/IOU ERC20 -> L1 Native ERC20
+        // L2 l2StandardBridge.bridgeERC20To -> L1 L1StandardBridge ???
+        // -------------------------------------------------------------------------
+        // [] PENDING,
+        // L1 (proof):
+        // L1 (withdrawal):
+        // L2: http://localhost:33286/tx/aa
+        if (false) {
+            // Initial
+            if (true) {
+                // Move to L2
+                vm.stopBroadcast();
+                vm.createSelectFork(vm.rpcUrl("l2_devnet"));
+                vm.startBroadcast();
+
+                // Approve L2Token to the L2StandardBridge
+                L2Token.approve(address(l2StandardBridge), 4e18);
+
+                uint256 _nonce = l2ToL1MessagePasser.messageNonce(); // Uses Encoding.encodeVersionedNonce(_nonce, _version);
+                console.log("_nonce: ", _nonce);
+
+                // Initiate withdrawal
+                l2StandardBridge.bridgeERC20To(
+                    address(L2Token),
+                    address(L1Token),
+                    testerAddress,
+                    4e18,
+                    200_000,
+                    hex"123456"
+                );
+            }
+
+            // Proof
+            if (true) {}
+        }
+
+        // L2 GAS gas token -> L1 GAS ERC20
+        // L2 L2ToL1MessagePasser -> L1 FraxtalPortal2 ???
+        // -------------------------------------------------------------------------
+        // [] PENDING, Called On Jan 20 ~6:20PM PST. ETA ~ Jan 24 @ 6:20PM PST
+        // L1 (proof):
+        // L1 (withdrawal):
+        // gameClone: 0x156e4FC171ad2e9B830Be8cc87D9497B7059FF11
+        // L2: http://localhost:33286/tx/0xc2bb48faf4e4348a842f2a879248a2cb1c379c7dc2217d65db43e6a3d8884f53
+        if (true) {
+            // Initial
+            if (false) {
+                // Move to L2
+                vm.stopBroadcast();
+                vm.createSelectFork(vm.rpcUrl("l2_devnet"));
+                vm.startBroadcast();
+
+                uint256 _nonce = l2ToL1MessagePasser.messageNonce(); // Uses Encoding.encodeVersionedNonce(_nonce, _version);
+                console.log("_nonce: ", _nonce);
+
+                // Initiate withdrawal
+                l2ToL1MessagePasser.initiateWithdrawal{ value: 2.5e18 }(testerAddress, 200_000, hex"123456");
+            }
+
+            // Create the dispute game and withdraw (multiple steps)
+            if (true) {
+                uint256 _nonce = 1_766_847_064_778_384_329_583_297_500_742_918_515_827_483_896_875_618_958_121_606_201_292_619_778;
+
+                Types.WithdrawalTransaction memory _tx = Types.WithdrawalTransaction({
+                    nonce: _nonce,
+                    sender: testerAddress,
+                    target: testerAddress,
+                    value: 2.5e18,
+                    gasLimit: 200_000,
+                    data: hex"123456"
+                });
+
+                // Get modified proof inputs.
+                (
+                    _stateRoot,
+                    _storageRoot,
+                    _outputRoot,
+                    _withdrawalHash,
+                    _withdrawalProof
+                ) = ffiGetProveWithdrawalTransactionInputs(_tx);
+                _outputRootProof = Types.OutputRootProof({
+                    version: bytes32(0),
+                    stateRoot: _stateRoot,
+                    messagePasserStorageRoot: _storageRoot,
+                    latestBlockhash: bytes32(0)
+                });
+
+                // Ensure the values returned from ffi are correct
+                assert(_outputRoot == Hashing.hashOutputRootProof(_outputRootProof));
+                assert(_withdrawalHash == Hashing.hashWithdrawal(_tx));
+
+                // Create the dispute game
+                if (true) {
+                    // Create a dispute game with the output root we've proposed.
+                    _proposedBlockNumber = block.number + 25;
+
+                    // Do the dispute game
+                    PermissionedDisputeGame gameClone;
+                    {
+                        vm.stopBroadcast();
+                        vm.startBroadcast(gameProposerPk);
+
+                        // Create the game
+                        gameClone = PermissionedDisputeGame(
+                            payable(
+                                address(
+                                    DisputeGameFactory(disputeGameFactoryPxyAddress).create(
+                                        FraxtalPortal2(optimismPortalPxyAddress).respectedGameType(),
+                                        Claim.wrap(_outputRoot),
+                                        abi.encode(_proposedBlockNumber)
+                                    )
+                                )
+                            )
+                        );
+                        console.log("gameClone: ", address(gameClone));
+                    }
+                }
+
+                // Resolve the claim and prove the withdrawal
+                if (false) {
+                    // Instantiate the game
+                    PermissionedDisputeGame gameClone = PermissionedDisputeGame(
+                        0x156e4FC171ad2e9B830Be8cc87D9497B7059FF11
+                    );
+
+                    // Broadcast as the game proposer
+                    vm.stopBroadcast();
+                    vm.startBroadcast(gameProposerPk);
+
+                    // Get the time left for the claim
+                    uint256 _claimIndex = 0;
+                    {
+                        int64 _cld = int64(Duration(gameClone.getChallengerDuration(_claimIndex)).raw());
+                        int64 _maxClock = int64(Duration(gameClone.maxClockDuration()).raw());
+                        console.log("getChallengerDuration: ", _cld);
+                        console.log("MAX_CLOCK_DURATION: ", _maxClock);
+                        console.log("Time left: ", _maxClock - _cld);
+                    }
+
+                    // Resolve the claim
+                    gameClone.resolveClaim(_claimIndex, 0);
+                    gameClone.resolve();
+                    _proposedGameIndex = DisputeGameFactory(disputeGameFactoryPxyAddress).gameCount() - 1;
+
+                    // Switch back to the test user
+                    vm.stopBroadcast();
+                    vm.startBroadcast(vm.envUint("PK"));
+
+                    // Do the withdrawal
+                    vm.expectEmit(true, true, true, true);
+                    emit WithdrawalProven(_withdrawalHash, _tx.sender, _tx.target);
+                    FraxtalPortal2(optimismPortalPxyAddress).proveWithdrawalTransaction(
+                        _tx,
+                        _proposedGameIndex,
+                        _outputRootProof,
+                        _withdrawalProof
+                    );
+                }
+            }
+        }
+
+        vm.stopBroadcast();
+    }
+}

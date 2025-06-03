@@ -21,6 +21,9 @@ docs/
 # Go binaries
 scripts/go/bin/*
 
+# Scripts
+scripts/flox/*
+
 #misc
 node_modules
 .DS_Store

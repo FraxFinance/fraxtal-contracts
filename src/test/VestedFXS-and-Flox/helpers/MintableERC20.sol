@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity >=0.8.0;
 
-import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
+import "@openzeppelin-4/contracts/token/ERC20/ERC20.sol";
 
 /// @notice Mintable ERC20 token used to faciltae testing
 /// @dev MUST not use in production because of exposed non-gated mint function

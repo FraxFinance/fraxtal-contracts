@@ -1,0 +1,69 @@
+"superchainDeployment": {
+    "proxyAdminAddress": "0x4bf8d2e79e33cfd5a8348737ca91be5f65ea7dd9",
+    "superchainConfigProxyAddress": "0x91bf7398afc3d2691aa23799fdb9175ee2eb6105",
+    "superchainConfigImplAddress": "0x120671ccdfebc50cfe7b7a62bd0593aa6e3f3cf0",
+    "protocolVersionsProxyAddress": "0xb74bb6ae1a1804d283d17e95620da9b9b0e6e0da",
+    "protocolVersionsImplAddress": "0x1212ee52bc401cca1bf752d7e13f78a4eb3ebbb3"
+  },
+  "implementationsDeployment": {
+    "opcmAddress": "0x9ab1873527465cd69a4c908ef2417388ce0bf0de",
+    "delayedWETHImplAddress": "0x7fc26b95ded0f51d4efd4bd7ee44260a941faaab",
+    "optimismPortalImplAddress": "0x0d8a5301ef950408ae1654449766a982b554dbb1",
+    "preimageOracleSingletonAddress": "0xc69c1e66f9ead5836d96bd1128569eb2a0058579",
+    "mipsSingletonAddress": "0x36c038b0081a2c345bf3b9e2a2331a781457b0a5",
+    "systemConfigImplAddress": "0xfbaf9dc705b8d6cbb8e0be6d1166e362e372d71e",
+    "l1CrossDomainMessengerImplAddress": "0xa51c441cd6515ad6113a3c23fc5dea357fd4281d",
+    "l1ERC721BridgeImplAddress": "0x380a5d89e743f6236a429b31e29dce1ecaf00d28",
+    "l1StandardBridgeImplAddress": "0x68d57f329d6fe654aba46f9c26668deace383a7d",
+    "optimismMintableERC20FactoryImplAddress": "0x7e6ffbdc3dd2a310d134d75cf7913121dd84c52b",
+    "disputeGameFactoryImplAddress": "0xc9de3bb0e3f74d9a2e594d52dc7a83f6b7733463"
+  },
+  "opChainDeployments": [
+    {
+      "id": "0x000000000000000000000000000000000000000000000000000000000020d5e4",
+      "proxyAdminAddress": "0xfcb316bd1f7cea57e7e2ef62b8f3ddfb76e5f524",
+      "addressManagerAddress": "0x7d4bdd7731f6c4e91b4f30b93d76af537d327180",
+      "l1ERC721BridgeProxyAddress": "0x1cc032484ed0e2944ab84be1087650eeef48dade",
+      "systemConfigProxyAddress": "0x25c7cce7d8bee27ef18a282154a5a312b53c9bba",
+      "optimismMintableERC20FactoryProxyAddress": "0x97984b1cb06ce153d02aa7d225bf14c6e0edcfde",
+      "l1StandardBridgeProxyAddress": "0x1a931dafc3e9fefc9e2e5943d8b226bf6043234b",
+      "l1CrossDomainMessengerProxyAddress": "0x0282b6304d977c5b39af565e90c34fbd0d1bb718",
+      "optimismPortalProxyAddress": "0xd943ef21d6af93ddf42a5cc91ca46d7da8582339",
+      "disputeGameFactoryProxyAddress": "0xb38b16e0539b5ac342ce642e0d503412ef82d81a",
+      "anchorStateRegistryProxyAddress": "0x8772d9c7a672935a3e5808dcd95fbc5c2be5b38a",
+      "anchorStateRegistryImplAddress": "0x63b1d5407a524515ae2a4c2308cd6419ed57655a",
+      "faultDisputeGameAddress": "0x0000000000000000000000000000000000000000",
+      "permissionedDisputeGameAddress": "0xcfdbdabf7db91e7b712d7584227ffbd674e2ad6a",
+      "delayedWETHPermissionedGameProxyAddress": "0x8a6f9a6feae5cd9a9bb89f95628da8cd20ff517e",
+      "delayedWETHPermissionlessGameProxyAddress": "0x0000000000000000000000000000000000000000",
+      "dataAvailabilityChallengeProxyAddress": "0x0000000000000000000000000000000000000000",
+      "dataAvailabilityChallengeImplAddress": "0x0000000000000000000000000000000000000000",
+    }
+]
+
+just as a ref, the logs of the run
+== Logs ==
+  Executing as 0x39Dc844B8b461c6de6c572cad9585d9f5A8DEa6A
+  Systemconfig version: 2.3.0-beta.6
+  Systemconfig owner: 0x8e44fEbeaE9C2F2Bc89480aE8084328Badc496c2
+  Systemconfig basefeeScalar: 1368
+  Systemconfig blobbasefeeScalar: 801949
+  Systemconfig batcherHash: 1210011053889338503540166963274920152971028360245
+  Systemconfig gasLimit: 60000000
+  Systemconfig unsafeBlockSigner: 0xbb900Cf56918A2639dAA90c3f7DC5DCD2f5B9935
+  Systemconfig resourceConfig elasticityMultiplier 10
+  Systemconfig batchInbox: 0x00a4FE4C6AaA0729d7699c387E7f281DD64aFA2a
+  Systemconfig addresses l1CrossDomainMessenger: 0x0282B6304d977c5b39AF565e90C34fBd0D1bB718
+  Systemconfig addresses l1ERC721Bridge: 0x1cc032484ed0E2944Ab84bE1087650eeeF48dADE
+  Systemconfig addresses l1StandardBridge: 0x1A931DAFC3E9FEfc9E2e5943D8B226bf6043234B
+  Systemconfig addresses disputeGameFactory: 0xb38B16e0539b5ac342CE642E0d503412Ef82D81A
+  Systemconfig addresses optimismPortal: 0xD943EF21D6Af93DDF42a5cc91Ca46D7dA8582339
+  Systemconfig addresses optimismMintableERC20Factory: 0x97984b1cb06ce153D02aA7D225Bf14C6E0edCfdE
+  Systemconfig addresses gasPayingToken: 0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE
+  Gas contract deployed at 0x62b576317e8A0718D728DCCc74A6d4fbb0e12557
+  StorageSetter deployed at 0x0B7788C505a96F6109C2ab98c18eb0f78B597006
+  Current systemConfig implementation address 0xFBaf9dC705b8d6cbB8e0Be6D1166e362e372d71e
+  Cleared systemconfig initialized flag, new value 0
+  succ true
+  System config reinitialized
+  Initialized flag 1

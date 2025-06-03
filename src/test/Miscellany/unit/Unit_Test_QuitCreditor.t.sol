@@ -5,7 +5,7 @@ import { BaseTestMisc } from "../BaseTestMisc.t.sol";
 import { FraxFarmQuitCreditor_UniV3 } from "src/contracts/Miscellany/FraxFarmQuitCreditor/FraxFarmQuitCreditor_UniV3.sol";
 import { L1QuitCreditorReceiverConverter } from "src/contracts/Miscellany/FraxFarmQuitCreditor/L1QuitCreditorReceiverConverter.sol";
 import { DeployL1QuitCreditorReceiverConverters } from "src/script/Miscellany/DeployL1QuitCreditorReceiverConverters.s.sol";
-import { IERC20Metadata } from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
+import { IERC20Metadata } from "@openzeppelin-4/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 import { IFrax } from "src/contracts/Miscellany/interfaces/IFrax.sol";
 import { IFXB } from "src/contracts/Miscellany/interfaces/IFXB.sol";
 import { ICrossDomainMessenger } from "src/contracts/Miscellany/FraxFarmQuitCreditor/ICrossDomainMessenger.sol";

@@ -3,8 +3,8 @@
 pragma solidity >=0.8.0;
 
 import { OptimismMintablePermitERC20 } from "./OptimismMintablePermitERC20.sol";
-import { ISemver } from "@eth-optimism/contracts-bedrock/src/universal/ISemver.sol";
-import { Initializable } from "@openzeppelin/contracts/proxy/utils/Initializable.sol";
+import { ISemver } from "@eth-optimism/contracts-bedrock/src/universal/interfaces/ISemver.sol";
+import { Initializable } from "@openzeppelin-4/contracts/proxy/utils/Initializable.sol";
 
 /// @custom:proxied
 /// @custom:predeployed 0x4200000000000000000000000000000000000012

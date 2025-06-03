@@ -1,0 +1,144 @@
+// SPDX-License-Identifier: ISC
+pragma solidity ^0.8.0;
+
+import "../BaseTestFraxtalL1Devnet.t.sol";
+
+import { AddressAliasHelper } from "@eth-optimism/contracts-bedrock/src/vendor/AddressAliasHelper.sol";
+
+contract Test_L1L2_E2E is BaseTestFraxtalL1Devnet {
+    IFaultDisputeGame game;
+    uint256 _proposedGameIndex;
+    uint256 _proposedBlockNumber;
+    bytes32 _stateRoot;
+    bytes32 _storageRoot;
+    bytes32 _outputRoot;
+    bytes32 _withdrawalHash;
+    bytes[] _withdrawalProof;
+    Types.OutputRootProof internal _outputRootProof;
+
+    function setUp() public {
+        defaultSetup();
+
+        // Give the portal some FXS
+        hoax(alice);
+        FXS.approve(optimismPortalPxyAddress, 10_000e18);
+        hoax(alice);
+        fraxtalPortal2.depositERC20Transaction(alice, 10_000e18, 10_000e18, 200_000, false, "");
+
+        // Mine a block
+        mineBlocks(1);
+    }
+
+    function test_L1GasERC20ToL2NativeGas() external {
+        // L1 FraxtalPortal2.depositERC20Transaction -> L2 (sequencer mints directly)
+        // Nothing to do here. Sequencer should handle it
+    }
+
+    function test_L1NormalERC20ToL2NormalERC20() external {
+        // L1 L1StandardBridge.bridgeERC20 -> L2 ??? (L2StandardBridge ???)
+    }
+
+    function test_L2NormalERC20ToL1NormalERC20() external {
+        // L2 L2StandardBridge.XXXX -> L1 ??? (L1StandardBridge ???)
+    }
+
+    // From live
+    function test_L2GasToL1GasERC20() external {
+        // L2 L2ToL1MessagePasser to L1 FraxtalPortal2
+
+        // Assume you have already done a real L2 withdrawal request on L2 already
+        // http://localhost:33286/tx/0xcf340f29ac8652dc2e4ab0d52b679af1494787d4b7e9753f6239f1ccedc02ada
+
+        // Get the nonce
+        uint256 _nonce = 1_196_399_822_864_866_582_922_313_804_063_091_419_624_415_988_956_024_291_569_705_133_770_662_039_636;
+
+        Types.WithdrawalTransaction memory _tx = Types.WithdrawalTransaction({ nonce: _nonce, sender: 0x625e700125FF054f75e5348497cBFab1ee4b7A40, target: 0x625e700125FF054f75e5348497cBFab1ee4b7A40, value: 2.5e18, gasLimit: 200_000, data: hex"123456" });
+
+        // Hash the block of the tx
+        // keccak256(abi.encode(523922)); ???
+        // LEAVE AS IS, MUST MATCH THE TX'S OUTPUTROOT THAT THE GAMECLONE WAS FACTORIED WITH
+        bytes32 _latestBlockHash = bytes32(0);
+
+        // Get modified proof inputs.
+        // OutputRoot is independent of the specific TX
+        (_stateRoot, _storageRoot, _outputRoot, _withdrawalHash, _withdrawalProof) = ffiGetProveWithdrawalTransactionInputs(_tx);
+        _outputRootProof = Types.OutputRootProof({ version: bytes32(0), stateRoot: _stateRoot, messagePasserStorageRoot: _storageRoot, latestBlockhash: _latestBlockHash });
+
+        // Initialize Dispute Game
+        // Each game can be used by multiple people, it is only the OutputRoot that is being proven/contested, not the specific withdrawal tx
+        // Once the OutputRoot is proven (after the game time is over), the withdrawal proof[] is submitted to FraxtalPortal2
+        // and it is proven that the L2ToL1MessagePasser storage for the specific withdrawal tx hash was stored on L2
+        PermissionedDisputeGame _thisGame = PermissionedDisputeGame(0x247Cc6D89b0bF0e23F09957AAb61E65093A6bCb3);
+
+        // Warp beyond the finalization period for the dispute game and resolve it.
+        vm.warp(block.timestamp + (_thisGame.maxClockDuration().raw() * 2) + 1 seconds);
+        _thisGame.resolveClaim(0, 0);
+        _thisGame.resolve();
+        uint256 _thisProposedGameIndex = DisputeGameFactory(disputeGameFactoryPxyAddress).gameCount() - 1;
+
+        // Do the withdrawal
+        vm.expectEmit(true, true, true, true);
+        emit WithdrawalProven(_withdrawalHash, _tx.sender, _tx.target);
+        FraxtalPortal2(optimismPortalPxyAddress).proveWithdrawalTransaction(_tx, _thisProposedGameIndex, _outputRootProof, _withdrawalProof);
+    }
+
+    // function test_L1ERC20ToL2Gas() external {
+    //     // Approve FXS to FraxtalPortal2
+    //     hoax(alice);
+    //     FXS.approve(optimismPortalPxyAddress, 1337e18);
+
+    //     // Deposit the FXS
+    //     hoax(alice);
+    //     fraxtalPortal2.depositERC20Transaction(alice, 1337e18, 1337e18, 200_000, false, "123456");
+
+    //     // Mine a block
+    //     mineBlocks(1);
+
+    //     // Go to L2
+    //     vm.selectFork(initialL2Fork);
+
+    //     // Give Alice minimal FXS gas
+    //     vm.deal(alice, 1e18);
+
+    //     // Note Alice's gas balance before
+    //     uint256 _aliceGasBefore = alice.balance;
+
+    //     // Check that the gas token is FXS
+    //     {
+    //         (address _gasTokenAddr, ) = l1Block.gasPayingToken();
+    //         assertEq(_gasTokenAddr, address(FXS), "l1Block.gasPayingToken() is not FXS");
+    //     }
+
+    //     // Prep
+    //     address target = alice;
+    //     address sender = address(l1XDomainMsgrCGT);
+    //     address caller = AddressAliasHelper.applyL1ToL2Alias(address(l1XDomainMsgrCGT));
+
+    //     // Relay
+    //     vm.prank(caller);
+    //     vm.expectCall(target, hex"123456");
+    //     vm.expectEmit(true, true, true, true);
+    //     bytes32 hash = Hashing.hashCrossDomainMessage(Encoding.encodeVersionedNonce(0, 1), sender, target, 0, 0, hex"123456");
+    //     emit RelayedMessage(hash);
+    //     l2CrossDomainMessenger.relayMessage(
+    //         Encoding.encodeVersionedNonce(0, 1), // nonce
+    //         sender,
+    //         target,
+    //         0, // value
+    //         0,
+    //         hex"123456"
+    //     );
+
+    //     // The message hash is in the successfulMessages mapping
+    //     assert(l2CrossDomainMessenger.successfulMessages(hash));
+
+    //     // It is not in the received messages mapping
+    //     assertEq(l2CrossDomainMessenger.failedMessages(hash), false);
+
+    //     // Alice's L2 FXS gas balance increased
+    //     assertEq(alice.balance - _aliceGasBefore, 1337e18, "Alice should have received FXS gas on L2");
+
+    // }
+
+    function test_L2GasToL1ERC20() external { }
+}

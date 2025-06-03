@@ -1,13 +1,15 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.15;
+pragma solidity ^0.8.0;
 
 import { ERC20Permit, ERC20 } from "@openzeppelin-5/contracts/token/ERC20/extensions/ERC20Permit.sol";
-import { IERC165 } from "@openzeppelin/contracts/utils/introspection/IERC165.sol";
+import { IERC165 } from "@openzeppelin-4/contracts/utils/introspection/IERC165.sol";
 import {
-    ILegacyMintableERC20,
+    ILegacyMintableERC20
+} from "@eth-optimism/contracts-bedrock/src/universal/interfaces/ILegacyMintableERC20.sol";
+import {
     IOptimismMintableERC20
-} from "@eth-optimism/contracts-bedrock/src/universal/IOptimismMintableERC20.sol";
-import { ISemver } from "@eth-optimism/contracts-bedrock/src/universal/ISemver.sol";
+} from "@eth-optimism/contracts-bedrock/src/universal/interfaces/IOptimismMintableERC20.sol";
+import { ISemver } from "@eth-optimism/contracts-bedrock/src/universal/interfaces/ISemver.sol";
 
 /// @title OptimismMintablePermitERC20
 /// @notice OptimismMintablePermitERC20 is a standard extension of the base ERC20 token contract designed

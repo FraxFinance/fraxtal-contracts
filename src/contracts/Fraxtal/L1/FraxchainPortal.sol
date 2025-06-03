@@ -1,8 +1,11 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.15;
+pragma solidity ^0.8.0;
 
-import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import { Initializable } from "@openzeppelin/contracts/proxy/utils/Initializable.sol";
+import { IERC20 } from "@openzeppelin-4/contracts/token/ERC20/IERC20.sol";
+// import { Initializable } from "@openzeppelin-4/contracts/proxy/utils/Initializable.sol";
+import {
+    Initializable
+} from "@eth-optimism/contracts-bedrock/lib/openzeppelin-contracts/contracts/proxy/utils/Initializable.sol";
 import { SafeCall } from "@eth-optimism/contracts-bedrock/src/libraries/SafeCall.sol";
 import { L2OutputOracle } from "@eth-optimism/contracts-bedrock/src/L1/L2OutputOracle.sol";
 import { SystemConfig } from "@eth-optimism/contracts-bedrock/src/L1/SystemConfig.sol";
@@ -12,8 +15,9 @@ import { Types } from "@eth-optimism/contracts-bedrock/src/libraries/Types.sol";
 import { Hashing } from "@eth-optimism/contracts-bedrock/src/libraries/Hashing.sol";
 import { SecureMerkleTrie } from "@eth-optimism/contracts-bedrock/src/libraries/trie/SecureMerkleTrie.sol";
 import { AddressAliasHelper } from "@eth-optimism/contracts-bedrock/src/vendor/AddressAliasHelper.sol";
+import { IResourceMetering } from "@eth-optimism/contracts-bedrock/src/L1/interfaces/IResourceMetering.sol";
 import { ResourceMetering } from "@eth-optimism/contracts-bedrock/src/L1/ResourceMetering.sol";
-import { ISemver } from "@eth-optimism/contracts-bedrock/src/universal/ISemver.sol";
+import { ISemver } from "@eth-optimism/contracts-bedrock/src/universal/interfaces/ISemver.sol";
 
 /// @custom:proxied
 /// @title FraxchainPortal
@@ -195,12 +199,29 @@ contract FraxchainPortal is Initializable, ResourceMetering, ISemver {
         // Intentionally empty.
     }
 
+    // /// @notice Getter for the resource config.
+    // ///         Used internally by the ResourceMetering contract.
+    // ///         The SystemConfig is the source of truth for the resource config.
+    // /// @return ResourceMetering ResourceConfig
+    // function _resourceConfig() internal view override returns (ResourceMetering.ResourceConfig memory) {
+    //     return systemConfig.resourceConfig();
+    // }
+
     /// @notice Getter for the resource config.
     ///         Used internally by the ResourceMetering contract.
     ///         The SystemConfig is the source of truth for the resource config.
     /// @return ResourceMetering ResourceConfig
-    function _resourceConfig() internal view override returns (ResourceMetering.ResourceConfig memory) {
-        return systemConfig.resourceConfig();
+    function _resourceConfig() internal view override returns (ResourceConfig memory) {
+        IResourceMetering.ResourceConfig memory config = systemConfig.resourceConfig();
+        return
+            ResourceConfig({
+                maxResourceLimit: config.maxResourceLimit,
+                elasticityMultiplier: config.elasticityMultiplier,
+                baseFeeMaxChangeDenominator: config.baseFeeMaxChangeDenominator,
+                minimumBaseFee: config.minimumBaseFee,
+                systemTxMaxGas: config.systemTxMaxGas,
+                maximumBaseFee: config.maximumBaseFee
+            });
     }
 
     /// @notice Proves a withdrawal transaction.

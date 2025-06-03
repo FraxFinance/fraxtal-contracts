@@ -1,0 +1,142 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+// import { IERC20 } from "@openzeppelin-5/contracts/token/ERC20/IERC20.sol";
+// import { ERC20Permit, ERC20 } from "@openzeppelin-5/contracts/token/ERC20/extensions/ERC20Permit.sol";
+// import { ERC20Burnable } from "@openzeppelin-5/contracts/token/ERC20/extensions/ERC20Burnable.sol";
+// import { IERC165 } from "@openzeppelin-5/contracts/utils/introspection/IERC165.sol";
+// import {
+//     ILegacyMintableERC20
+// } from "@eth-optimism/contracts-bedrock/src/universal/interfaces/ILegacyMintableERC20.sol";
+// import {
+//     IOptimismMintableERC20
+// } from "@eth-optimism/contracts-bedrock/src/universal/interfaces/IOptimismMintableERC20.sol";
+// import { OwnedV2 } from "./vanity/OwnedV2.sol";
+// import { ISemver } from "@eth-optimism/contracts-bedrock/src/universal/interfaces/ISemver.sol";
+
+import { IERC20 } from "@openzeppelin-4/contracts/token/ERC20/IERC20.sol";
+import { ERC20Permit, ERC20 } from "@openzeppelin-4/contracts/token/ERC20/extensions/ERC20Permit.sol";
+import { ERC20Burnable } from "@openzeppelin-4/contracts/token/ERC20/extensions/ERC20Burnable.sol";
+import { IERC165 } from "@openzeppelin-4/contracts/utils/introspection/IERC165.sol";
+import {
+    ILegacyMintableERC20
+} from "@eth-optimism/contracts-bedrock/src/universal/interfaces/ILegacyMintableERC20.sol";
+import {
+    IOptimismMintableERC20
+} from "@eth-optimism/contracts-bedrock/src/universal/interfaces/IOptimismMintableERC20.sol";
+import { OwnedV2 } from "./vanity/OwnedV2.sol";
+import { ISemver } from "@eth-optimism/contracts-bedrock/src/universal/interfaces/ISemver.sol";
+
+/// @title New contract for wFRAX, which is the old FXS token (now the gas token) wrapped and renamed.
+/**
+ * @notice Has Openzeppelin's ERC20Permit with Synthetix's Owned.
+ *     Added WETH9-like features.
+ *     To preserve storage patterns, some variables are no longer used but need to be included.
+ */
+/// @dev ERC20ExPPOMWrapped adheres to EIP-712/EIP-2612 and can use permits
+contract ERC20ExPPOMWrapped is ERC20Permit, OwnedV2, ISemver {
+    /// @custom:semver 1.0.1
+    string public constant version = "1.0.1";
+
+    /// @notice The timelock address
+    address public timelock_address;
+
+    // /// @notice [DEPRECATED] Address of the L2 StandardBridge on this network.
+    // address public immutable DEPRECATED___BRIDGE;
+
+    // /// @notice [DEPRECATED] Address of the corresponding version of this token on the remote chain.
+    // address public immutable DEPRECATED___REMOTE_TOKEN;
+
+    /// @notice [DEPRECATED] Array of the non-bridge minters
+    address[] public DEPRECATED___minters_array;
+
+    /// @notice [DEPRECATED] Mapping of the non-bridge minters
+    /// @dev Mapping is used for faster verification
+    mapping(address => bool) public DEPRECATED___minters;
+
+    // ==============================================================================
+    // CONSTRUCTOR
+    // ==============================================================================
+
+    /// @custom:semver 1.0.0
+    /// @param _creator_address The contract creator
+    /// @param _timelock_address The timelock
+    /// @param _name ERC20 name
+    /// @param _symbol ERC20 symbol
+    constructor(
+        address _creator_address,
+        address _timelock_address,
+        string memory _name,
+        string memory _symbol
+    ) ERC20(_name, _symbol) ERC20Permit(_name) OwnedV2(_creator_address) {
+        timelock_address = _timelock_address;
+    }
+
+    /* ========== MODIFIERS ========== */
+
+    /// @notice A modifier that only allows the contract owner or the timelock to call
+    modifier onlyByOwnGov() {
+        require(msg.sender == timelock_address || msg.sender == owner, "Not owner or timelock");
+        _;
+    }
+
+    /* ========== ERC-20 OVERRIDES ========== */
+
+    /* ========== WETH9-STYLE FUNCTIONS ========== */
+
+    /// @notice Fallback gas token deposit
+    fallback() external payable {
+        deposit();
+    }
+
+    /// @notice Deposit gas token for wrapped ERC20. Uses msg.value
+    function deposit() public payable {
+        // Accept the gas tokens and mint the ERC20 to the sender
+        _mint(msg.sender, msg.value);
+
+        emit Deposit(msg.sender, msg.value);
+    }
+
+    /// @notice Withdraw ERC20 for gas token.
+    /// @param wad Amount of gas token to receive / wrapped ERC20 to burn.
+    function withdraw(uint256 wad) public {
+        // Will revert if sender does not have enough ERC20 tokens
+        _burn(msg.sender, wad);
+
+        // Give the sender the gas tokens
+        payable(msg.sender).transfer(wad);
+
+        emit Withdrawal(msg.sender, wad);
+    }
+
+    // /// @notice Total ERC20 supply
+    // function totalSupply() public view override returns (uint256) {
+    //     return address(this).balance;
+    // }
+
+    /* ========== RESTRICTED FUNCTIONS [ADMIN-RELATED] ========== */
+
+    /// @notice Sets the timelock address
+    /// @param _timelock_address Address of the timelock
+    function setTimelock(address _timelock_address) public onlyByOwnGov {
+        require(_timelock_address != address(0), "Zero address detected");
+        timelock_address = _timelock_address;
+        emit TimelockChanged(_timelock_address);
+    }
+
+    /* ========== EVENTS ========== */
+
+    /// @notice Emitted when the gas token is wrapped
+    /// @param dst Sender/depositor
+    /// @param wad Amount of tokens wrapped
+    event Deposit(address indexed dst, uint256 wad);
+
+    /// @notice Emitted when the timelock address changes
+    /// @param timelock_address Address of the new timelock
+    event TimelockChanged(address timelock_address);
+
+    /// @notice Emitted when the gas token is unwrapped
+    /// @param src Sender / withdrawer
+    /// @param wad Amount of tokens unwrapped
+    event Withdrawal(address indexed src, uint256 wad);
+}

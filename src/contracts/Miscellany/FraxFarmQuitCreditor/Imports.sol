@@ -5,7 +5,7 @@ pragma solidity >=0.8.0;
 
 pragma abicoder v2;
 
-// File @openzeppelin/contracts/token/ERC20/extensions/IERC20Permit.sol@v5.0.1
+// File @openzeppelin-4/contracts/token/ERC20/extensions/IERC20Permit.sol@v5.0.1
 
 // Original license: SPDX_License_Identifier: MIT
 // OpenZeppelin Contracts (last updated v5.0.0) (token/ERC20/extensions/IERC20Permit.sol)
@@ -96,7 +96,7 @@ interface IERC20Permit {
     function DOMAIN_SEPARATOR() external view returns (bytes32);
 }
 
-// File @openzeppelin/contracts/token/ERC20/IERC20.sol@v5.0.1
+// File @openzeppelin-4/contracts/token/ERC20/IERC20.sol@v5.0.1
 
 // Original license: SPDX_License_Identifier: MIT
 // OpenZeppelin Contracts (last updated v5.0.0) (token/ERC20/IERC20.sol)
@@ -176,7 +176,7 @@ interface IERC20 {
     function transferFrom(address from, address to, uint256 value) external returns (bool);
 }
 
-// File @openzeppelin/contracts/utils/Address.sol@v5.0.1
+// File @openzeppelin-4/contracts/utils/Address.sol@v5.0.1
 
 // Original license: SPDX_License_Identifier: MIT
 // OpenZeppelin Contracts (last updated v5.0.0) (utils/Address.sol)
@@ -336,7 +336,7 @@ library Address {
     }
 }
 
-// File @openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol@v5.0.1
+// File @openzeppelin-4/contracts/token/ERC20/utils/SafeERC20.sol@v5.0.1
 
 // Original license: SPDX_License_Identifier: MIT
 // OpenZeppelin Contracts (last updated v5.0.0) (token/ERC20/utils/SafeERC20.sol)
@@ -451,7 +451,7 @@ library SafeERC20 {
     }
 }
 
-// File @openzeppelin/contracts/utils/introspection/IERC165.sol@v5.0.1
+// File @openzeppelin-4/contracts/utils/introspection/IERC165.sol@v5.0.1
 
 // Original license: SPDX_License_Identifier: MIT
 // OpenZeppelin Contracts (last updated v5.0.0) (utils/introspection/IERC165.sol)
@@ -477,7 +477,7 @@ interface IERC165 {
     function supportsInterface(bytes4 interfaceId) external view returns (bool);
 }
 
-// File @openzeppelin/contracts/token/ERC721/IERC721.sol@v5.0.1
+// File @openzeppelin-4/contracts/token/ERC721/IERC721.sol@v5.0.1
 
 // Original license: SPDX_License_Identifier: MIT
 // OpenZeppelin Contracts (last updated v5.0.0) (token/ERC721/IERC721.sol)
@@ -611,7 +611,7 @@ interface IERC721 is IERC165 {
     function isApprovedForAll(address owner, address operator) external view returns (bool);
 }
 
-// File @openzeppelin/contracts/token/ERC721/extensions/IERC721Enumerable.sol@v5.0.1
+// File @openzeppelin-4/contracts/token/ERC721/extensions/IERC721Enumerable.sol@v5.0.1
 
 // Original license: SPDX_License_Identifier: MIT
 // OpenZeppelin Contracts (last updated v5.0.0) (token/ERC721/extensions/IERC721Enumerable.sol)
@@ -639,7 +639,7 @@ interface IERC721Enumerable is IERC721 {
     function tokenByIndex(uint256 index) external view returns (uint256);
 }
 
-// File @openzeppelin/contracts/token/ERC721/extensions/IERC721Metadata.sol@v5.0.1
+// File @openzeppelin-4/contracts/token/ERC721/extensions/IERC721Metadata.sol@v5.0.1
 
 // Original license: SPDX_License_Identifier: MIT
 // OpenZeppelin Contracts (last updated v5.0.0) (token/ERC721/extensions/IERC721Metadata.sol)
@@ -2341,9 +2341,7 @@ interface IUniswapV3Pool is
     IUniswapV3PoolActions,
     IUniswapV3PoolOwnerActions,
     IUniswapV3PoolEvents
-{
-
-}
+{}
 
 // File contracts/Uniswap_V3/libraries/FixedPoint96.sol
 
@@ -2814,7 +2812,11 @@ library TickMath {
         int24 tickLow = int24((log_sqrt10001 - 3_402_992_956_809_132_418_596_140_100_660_247_210) >> 128);
         int24 tickHi = int24((log_sqrt10001 + 291_339_464_771_989_622_907_027_621_153_398_088_495) >> 128);
 
-        tick = tickLow == tickHi ? tickLow : getSqrtRatioAtTick(tickHi) <= sqrtPriceX96 ? tickHi : tickLow;
+        tick = tickLow == tickHi
+            ? tickLow
+            : getSqrtRatioAtTick(tickHi) <= sqrtPriceX96
+                ? tickHi
+                : tickLow;
     }
 }
 

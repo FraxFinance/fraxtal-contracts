@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.15;
+pragma solidity ^0.8.0;
 
-import { IERC4626 } from "@openzeppelin/contracts/interfaces/IERC4626.sol";
+import { IERC4626 } from "@openzeppelin-4/contracts/interfaces/IERC4626.sol";
 import { IPriceOracle } from "../interfaces/IPriceOracle.sol";
 
 /// @title ERC4626PriceOracle

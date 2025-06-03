@@ -30,9 +30,9 @@ pragma solidity >=0.8.0;
 import { VeFXSAggregator } from "./VeFXSAggregator.sol";
 import { IveFXSStructs } from "./IveFXSStructs.sol";
 import { TransferHelper } from "../Flox/TransferHelper.sol";
-import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
-import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
-import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
+import "@openzeppelin-4/contracts/token/ERC20/ERC20.sol";
+import "@openzeppelin-4/contracts/token/ERC20/utils/SafeERC20.sol";
+import "@openzeppelin-4/contracts/security/ReentrancyGuard.sol";
 import { OwnedV2AutoMsgSender } from "./OwnedV2AutoMsgSender.sol";
 
 // import "forge-std/console2.sol";

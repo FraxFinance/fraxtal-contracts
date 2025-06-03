@@ -12,7 +12,7 @@ pragma solidity >=0.8.0;
 // =================== BalancerPoolBalanceChecker =====================
 // ====================================================================
 
-import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import { IERC20 } from "@openzeppelin-4/contracts/token/ERC20/IERC20.sol";
 import { IBalancerPool } from "./interfaces/IBalancerPool.sol";
 import { IBalancerVault } from "./interfaces/IBalancerVault.sol";
 

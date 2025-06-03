@@ -1,0 +1,71 @@
+// SPDX-License-Identifier: GPL-3.0
+pragma solidity ^0.8.0;
+
+import { EIP712 } from "@openzeppelin-5/contracts/utils/cryptography/EIP712.sol";
+
+// ====================================================================
+// |     ______                   _______                             |
+// |    / _____________ __  __   / ____(_____  ____ _____  ________   |
+// |   / /_  / ___/ __ `| |/_/  / /_  / / __ \/ __ `/ __ \/ ___/ _ \  |
+// |  / __/ / /  / /_/ _>  <   / __/ / / / / / /_/ / / / / /__/  __/  |
+// | /_/   /_/   \__,_/_/|_|  /_/   /_/_/ /_/\__,_/_/ /_/\___/\___/   |
+// |                                                                  |
+// ====================================================================
+// ========================== wfrxETHStripped =========================
+// ====================================================================
+// Stripped down (no ERC20 or permit functions) version of wfrxETH that can be inherited for an ERC20ExWrappedPPOM
+// Misc variable names changed, but storage order is preserved
+
+// Frax Finance: https://github.com/FraxFinance
+
+// Primary Author(s)
+// Travis Moore: https://github.com/FortisFortuna
+
+// Reviewer(s) / Contributor(s)
+// Sam Kazemian: https://github.com/samkazemian
+// Dennis: https://github.com/denett
+// Drake Evans: https://github.com/DrakeEvans
+// Justin Moore: https://github.com/0xJM
+
+// !!!!!!! CREDIT GOES TO DAPPHUB AND OPENZEPPELIN !!!!!!!
+
+// Copyright (C) 2015, 2016, 2017 Dapphub
+
+// This program is free software: you can redistribute it and/or modify
+// it under the terms of the GNU General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+
+// This program is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU General Public License for more details.
+
+// You should have received a copy of the GNU General Public License
+// along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
+contract wfrxETHStripped is EIP712 {
+    // EIP-2612 State Variables
+    // =============================================
+
+    mapping(address => uint256) public _nonces;
+
+    // solhint-disable-next-line var-name-mixedcase
+    bytes32 public constant _PERMIT_TYPEHASH =
+        keccak256("Permit(address owner,address spender,uint256 value,uint256 nonce,uint256 deadline)");
+    /**
+     * @dev In previous versions `_PERMIT_TYPEHASH` was declared as `immutable`.
+     * However, to ensure consistency with the upgradeable transpiler, we will continue
+     * to reserve a slot.
+     * @custom:oz-renamed-from _PERMIT_TYPEHASH
+     */
+    // solhint-disable-next-line var-name-mixedcase
+    bytes32 private _PERMIT_TYPEHASH_DEPRECATED_SLOT;
+
+    // Constructor
+    // =============================================
+
+    /// @notice Constructs this contract
+    /// @param _theName Name of the token
+    constructor(string memory _theName) EIP712(_theName, "1") {}
+}

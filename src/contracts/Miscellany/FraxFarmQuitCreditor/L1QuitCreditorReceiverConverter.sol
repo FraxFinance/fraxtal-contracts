@@ -21,10 +21,10 @@ pragma solidity >=0.8.0;
 // Reviewer(s) / Contributor(s)
 // Dennis: https://github.com/denett
 
-import { SafeERC20 } from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
-import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import { SafeERC20 } from "@openzeppelin-4/contracts/token/ERC20/utils/SafeERC20.sol";
+import { IERC20 } from "@openzeppelin-4/contracts/token/ERC20/IERC20.sol";
 import { OwnedV2 } from "src/contracts/Miscellany/OwnedV2.sol";
-import { ReentrancyGuard } from "@openzeppelin/contracts/security/ReentrancyGuard.sol";
+import { ReentrancyGuard } from "@openzeppelin-4/contracts/security/ReentrancyGuard.sol";
 import { ICrossDomainMessenger } from "./ICrossDomainMessenger.sol";
 import { IExponentialPriceOracle } from "./IExponentialPriceOracle.sol";
 

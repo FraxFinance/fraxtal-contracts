@@ -34,7 +34,7 @@ pragma solidity >=0.8.0;
  */
 import { IVestedFXS } from "src/contracts/VestedFXS-and-Flox/interfaces/IVestedFXS.sol";
 import { IveFXSStructs } from "src/contracts/VestedFXS-and-Flox/VestedFXS/IveFXSStructs.sol";
-import { IERC20Metadata } from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
+import { IERC20Metadata } from "@openzeppelin-4/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 import "forge-std/console2.sol";
 
 /**

@@ -8,7 +8,7 @@ import { AaveAMO_V3 } from "src/contracts/Miscellany/AMOs/AaveAMO/AaveAMO_V3.sol
 import { DataTypes } from "src/contracts/Miscellany/AMOs/AaveAMO/misc/DataTypes.sol";
 import { DecimalStringHelper } from "src/test/VestedFXS-and-Flox/helpers/DecimalStringHelper.sol";
 import { IeETH } from "src/contracts/Miscellany/AMOs/AaveAMO/interfaces/IeETH.sol";
-import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import { IERC20 } from "@openzeppelin-4/contracts/token/ERC20/IERC20.sol";
 import { IFrax } from "src/contracts/Miscellany/interfaces/IFrax.sol";
 import { IsFrax } from "src/contracts/Miscellany/interfaces/IsFrax.sol";
 import { IAaveOracle } from "src/contracts/Miscellany/AMOs/AaveAMO/interfaces/IAaveOracle.sol";
@@ -146,7 +146,9 @@ contract Misc_Test_AaveAMO_V3 is FraxTest {
 
         // Configure AMO settings
         // ---------------------------------------
+        // aaveEthV3Pool BASE_CURRENCY_UNIT is 100000000
         aaveAMO.setAmoPoolSettings(address(aaveEthV3Pool), false, false, false, 5e18, 1000 * aaveEthV3BaseCurrencyUnit, 200 * aaveEthV3BaseCurrencyUnit);
+        // aaveEtherFiV3Pool BASE_CURRENCY_UNIT is 100000000
         aaveAMO.setAmoPoolSettings(address(aaveEtherFiV3Pool), false, false, false, 5e18, 1000 * aaveEtherFiV3BaseCurrencyUnit, 200 * aaveEtherFiV3BaseCurrencyUnit);
     }
 

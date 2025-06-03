@@ -33,16 +33,16 @@ pragma solidity >=0.8.0;
  *       maxtime (4 years?)
  */
 /* solhint-disable max-line-length, not-rely-on-time */
-import { ERC20Burnable } from "@openzeppelin/contracts/token/ERC20/extensions/ERC20Burnable.sol";
+import { ERC20Burnable } from "@openzeppelin-4/contracts/token/ERC20/extensions/ERC20Burnable.sol";
 import { FPISLockerUtils } from "./FPISLockerUtils.sol";
-import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import { IERC20Metadata } from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
+import { IERC20 } from "@openzeppelin-4/contracts/token/ERC20/IERC20.sol";
+import { IERC20Metadata } from "@openzeppelin-4/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 import { IVestedFXS } from "../interfaces/IVestedFXS.sol";
 import { IlFPISEvents } from "./IlFPISEvents.sol";
 import { IlFPISStructs } from "./IlFPISStructs.sol";
 import { IveFXSStructs } from "../VestedFXS/IveFXSStructs.sol";
-import { ReentrancyGuard } from "@openzeppelin/contracts/security/ReentrancyGuard.sol";
-import { SafeERC20 } from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import { ReentrancyGuard } from "@openzeppelin-4/contracts/security/ReentrancyGuard.sol";
+import { SafeERC20 } from "@openzeppelin-4/contracts/token/ERC20/utils/SafeERC20.sol";
 
 /**
  * @title FPISLocker (lFPIS)

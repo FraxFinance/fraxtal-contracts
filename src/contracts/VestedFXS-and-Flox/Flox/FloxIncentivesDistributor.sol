@@ -18,7 +18,7 @@ pragma solidity >=0.8.0;
 import "./IFloxEvents.sol";
 import "./IFloxStructs.sol";
 import "../interfaces/IVestedFXS.sol";
-import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import "@openzeppelin-4/contracts/token/ERC20/IERC20.sol";
 import "forge-std/console2.sol";
 
 /**

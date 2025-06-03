@@ -1,4 +1,4 @@
-//SPDX-License-Identifier: Unlicense
+// SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
 import { IERC20 } from "@openzeppelin-5/contracts/token/ERC20/IERC20.sol";
@@ -6,10 +6,12 @@ import { ERC20Permit, ERC20 } from "@openzeppelin-5/contracts/token/ERC20/extens
 import { ERC20Burnable } from "@openzeppelin-5/contracts/token/ERC20/extensions/ERC20Burnable.sol";
 import { IERC165 } from "@openzeppelin-5/contracts/utils/introspection/IERC165.sol";
 import {
-    ILegacyMintableERC20,
+    ILegacyMintableERC20
+} from "@eth-optimism/contracts-bedrock/src/universal/interfaces/ILegacyMintableERC20.sol";
+import {
     IOptimismMintableERC20
-} from "@eth-optimism/contracts-bedrock/src/universal/IOptimismMintableERC20.sol";
-import { ISemver } from "@eth-optimism/contracts-bedrock/src/universal/ISemver.sol";
+} from "@eth-optimism/contracts-bedrock/src/universal/interfaces/IOptimismMintableERC20.sol";
+import { ISemver } from "@eth-optimism/contracts-bedrock/src/universal/interfaces/ISemver.sol";
 import { OwnedV2 } from "./vanity/OwnedV2.sol";
 
 /// @title Parent contract for frxETH.sol, but also CrossChainCanonicalV2
@@ -187,7 +189,7 @@ contract ERC20PermitPermissionedOptiMintable is
     /// @param minter_address Address of minter to remove
     function removeMinter(address minter_address) public onlyByOwnGov {
         require(minter_address != address(0), "Zero address detected");
-        require(minters[minter_address] == true, "Address nonexistant");
+        require(minters[minter_address] == true, "Address non-existent");
 
         // Delete from the mapping
         delete minters[minter_address];

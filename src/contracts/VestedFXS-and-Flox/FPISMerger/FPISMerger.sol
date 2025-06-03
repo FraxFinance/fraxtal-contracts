@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
-pragma solidity ^0.8.15;
+pragma solidity ^0.8.0;
 
 // ====================================================================
 // |     ______                   _______                             |
@@ -12,7 +12,7 @@ pragma solidity ^0.8.15;
 // ============================ FPISMerger ============================
 // ====================================================================
 
-import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import { IERC20 } from "@openzeppelin-4/contracts/token/ERC20/IERC20.sol";
 
 contract FPISMerger {
     /// @notice FPIS is used for locking

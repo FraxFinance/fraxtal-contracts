@@ -19,11 +19,11 @@ pragma solidity >=0.8.0;
  * After a set ending timestamp, all positions are unlockable
  * Frax Finance: https://github.com/FraxFinance
  */
-import { ERC20 } from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
-import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import { Math } from "@openzeppelin/contracts/utils/math/Math.sol";
+import { ERC20 } from "@openzeppelin-4/contracts/token/ERC20/ERC20.sol";
+import { IERC20 } from "@openzeppelin-4/contracts/token/ERC20/IERC20.sol";
+import { Math } from "@openzeppelin-4/contracts/utils/math/Math.sol";
 import { OwnedV2 } from "./OwnedV2.sol";
-import { ReentrancyGuard } from "@openzeppelin/contracts/security/ReentrancyGuard.sol";
+import { ReentrancyGuard } from "@openzeppelin-4/contracts/security/ReentrancyGuard.sol";
 import { TransferHelper } from "src/contracts/VestedFXS-and-Flox/Flox/TransferHelper.sol";
 
 // import "forge-std/console2.sol";

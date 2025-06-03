@@ -17,12 +17,12 @@ pragma solidity >=0.8.0;
  * Frax Finance: https://github.com/FraxFinance
  */
 import { AggregatorV3Interface } from "src/contracts/Miscellany/interfaces/AggregatorV3Interface.sol";
-import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import { IERC20 } from "@openzeppelin-4/contracts/token/ERC20/IERC20.sol";
 import { IERC20PermitPermissionedOptiMintable } from "./interfaces/IERC20PermitPermissionedOptiMintable.sol";
 import { OwnedV2AutoMsgSender } from "src/contracts/VestedFXS-and-Flox/VestedFXS/OwnedV2AutoMsgSender.sol";
-import { Math } from "@openzeppelin/contracts/utils/math/Math.sol";
-import { ReentrancyGuard } from "@openzeppelin/contracts/security/ReentrancyGuard.sol";
-import { SafeERC20 } from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import { Math } from "@openzeppelin-4/contracts/utils/math/Math.sol";
+import { ReentrancyGuard } from "@openzeppelin-4/contracts/security/ReentrancyGuard.sol";
+import { SafeERC20 } from "@openzeppelin-4/contracts/token/ERC20/utils/SafeERC20.sol";
 import "forge-std/console2.sol";
 
 contract FraxtalERC4626MintRedeemer is OwnedV2AutoMsgSender, ReentrancyGuard {
@@ -70,8 +70,8 @@ contract FraxtalERC4626MintRedeemer is OwnedV2AutoMsgSender, ReentrancyGuard {
 
     /// @notice Contract constructor
     constructor() {
-        // Set the contract as initialized
-        wasInitialized = true;
+        // // Set the contract as initialized
+        // wasInitialized = true;
     }
 
     /**
@@ -286,7 +286,12 @@ contract FraxtalERC4626MintRedeemer is OwnedV2AutoMsgSender, ReentrancyGuard {
     /// @return _sharesOut The amount of output shares expected
     /// @dev See {IERC4626-previewDeposit}
     function previewDeposit(uint256 _assetsIn) public view returns (uint256 _sharesOut) {
-        if (fee > 0) _assetsIn -= Math.mulDiv(fee, _assetsIn, 1e18, Math.Rounding.Up);
+        // Old additive method
+        // if (fee > 0) _assetsIn -= Math.mulDiv(fee, _assetsIn, 1e18, Math.Rounding.Up);
+        // _sharesOut = _convertToShares(_assetsIn, Math.Rounding.Down);
+
+        // New multiplicative method
+        if (fee > 0) _assetsIn = Math.mulDiv(_assetsIn, (1e18 - fee), 1e18, Math.Rounding.Down);
         _sharesOut = _convertToShares(_assetsIn, Math.Rounding.Down);
     }
 
@@ -295,8 +300,13 @@ contract FraxtalERC4626MintRedeemer is OwnedV2AutoMsgSender, ReentrancyGuard {
     /// @return _assetsIn The amount of input assets needed
     /// @dev See {IERC4626-previewMint}
     function previewMint(uint256 _sharesOut) public view returns (uint256 _assetsIn) {
+        // Old additive method
+        // _assetsIn = _convertToAssets(_sharesOut, Math.Rounding.Up);
+        // if (fee > 0) _assetsIn += Math.mulDiv(fee, _assetsIn, 1e18, Math.Rounding.Up);
+
+        // New multiplicative method
         _assetsIn = _convertToAssets(_sharesOut, Math.Rounding.Up);
-        if (fee > 0) _assetsIn += Math.mulDiv(fee, _assetsIn, 1e18, Math.Rounding.Up);
+        if (fee > 0) _assetsIn = Math.mulDiv(_assetsIn, 1e18, (1e18 - fee), Math.Rounding.Up);
     }
 
     /// @notice Allows an on-chain or off-chain user to simulate the effects of their withdrawal at the current block, given current on-chain conditions.
@@ -304,7 +314,12 @@ contract FraxtalERC4626MintRedeemer is OwnedV2AutoMsgSender, ReentrancyGuard {
     /// @return _sharesIn Amount of shares needed
     /// @dev See {IERC4626-previewWithdraw}
     function previewWithdraw(uint256 _assetsOut) public view returns (uint256 _sharesIn) {
-        if (fee > 0) _assetsOut += Math.mulDiv(fee, _assetsOut, 1e18, Math.Rounding.Up);
+        // Old additive method
+        // if (fee > 0) _assetsOut += Math.mulDiv(fee, _assetsOut, 1e18, Math.Rounding.Up);
+        // _sharesIn = _convertToShares(_assetsOut, Math.Rounding.Up);
+
+        // New multiplicative method
+        if (fee > 0) _assetsOut = Math.mulDiv(_assetsOut, 1e18, (1e18 - fee), Math.Rounding.Up);
         _sharesIn = _convertToShares(_assetsOut, Math.Rounding.Up);
     }
 
@@ -313,8 +328,13 @@ contract FraxtalERC4626MintRedeemer is OwnedV2AutoMsgSender, ReentrancyGuard {
     /// @return _assetsOut Amount of output asset expected
     /// @dev See {IERC4626-previewRedeem}
     function previewRedeem(uint256 _sharesIn) public view returns (uint256 _assetsOut) {
+        // Old additive method
+        // _assetsOut = _convertToAssets(_sharesIn, Math.Rounding.Down);
+        // if (fee > 0) _assetsOut -= Math.mulDiv(fee, _assetsOut, 1e18, Math.Rounding.Up);
+
+        // New multiplicative method
         _assetsOut = _convertToAssets(_sharesIn, Math.Rounding.Down);
-        if (fee > 0) _assetsOut -= Math.mulDiv(fee, _assetsOut, 1e18, Math.Rounding.Up);
+        if (fee > 0) _assetsOut = Math.mulDiv((1e18 - fee), _assetsOut, 1e18, Math.Rounding.Down);
     }
 
     // ERC4626 INTERNAL VIEWS

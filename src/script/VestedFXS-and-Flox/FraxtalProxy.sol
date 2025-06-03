@@ -13,7 +13,9 @@ pragma solidity ^0.8.0;
 // ====================================================================
 
 import { ERC1967Utils } from "@openzeppelin-5/contracts/proxy/ERC1967/ERC1967Utils.sol";
-import { TransparentUpgradeableProxy } from "@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
+import {
+    TransparentUpgradeableProxy
+} from "@openzeppelin-4/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
 
 contract FraxtalProxy is TransparentUpgradeableProxy {
     constructor(

@@ -1,0 +1,352 @@
+// SPDX-License-Identifier: UNLICENSED
+pragma solidity ^0.8.13;
+
+import { Script, console } from "forge-std/Script.sol";
+// import { Counter } from "../src/Counter.sol";
+import { Storage } from "./Storage.sol";
+import { StorageSetter } from "./StorageSetter.sol";
+
+import { ERC20 } from "@openzeppelin-4/contracts/token/ERC20/ERC20.sol";
+import { Ownable } from "@openzeppelin-4/contracts/access/Ownable.sol";
+
+contract GasToken is ERC20, Ownable {
+    constructor(address initialOwner) ERC20("Gas", "GAS") Ownable(initialOwner) {}
+
+    function mint(address to, uint256 amount) public onlyOwner {
+        _mint(to, amount);
+    }
+}
+
+contract DeployScript is Script {
+    // https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/master/contracts/proxy/utils/Initializable.sol#L76C1-L78C1
+    // keccak256(abi.encode(uint256(keccak256("openzeppelin.storage.Initializable")) - 1)) & ~bytes32(uint256(0xff))
+    bytes32 private constant INITIALIZABLE_STORAGE = 0xf0c57e16840df040f15088dc2f81fe391c3923bec73e23a9662efc9c229c6a00;
+
+    // These addresses can be found in the /network-configs/state.json file after the kurtosis deploy
+    ISystemConfig public systemConfig = ISystemConfig(0x25c7cCe7d8beE27EF18a282154a5a312b53C9BBA);
+
+    IProxyAdmin public superchainProxyAdmin = IProxyAdmin(0x4bF8D2E79E33cfd5a8348737CA91bE5F65Ea7dd9);
+
+    IProxyAdmin public opProxyAdmin = IProxyAdmin(0xfcb316bD1F7cea57e7E2ef62b8F3dDfB76e5F524);
+
+    string mnemonic = "test test test test test test test test test test test junk";
+
+    // Check https://github.com/ethereum-optimism/optimism/blob/6a871c54512ebdb749f46ccb7d27b1b60510eba1/op-deployer/pkg/deployer/init.go#L112 for logic
+    uint256 l1ProxyAdminOwnerPk = vm.deriveKey(mnemonic, "m/44'/60'/2'/2151908/", 6);
+    uint256 l2ProxyAdminOpSysOwnerPk = vm.deriveKey(mnemonic, "m/44'/60'/2'/2151908/", 5);
+    uint256 systemConfigOwnerPk = vm.deriveKey(mnemonic, "m/44'/60'/2'/2151908/", 10);
+
+    function setUp() public {}
+
+    function run() public {
+        vm.startBroadcast(l1ProxyAdminOwnerPk);
+        console.log("Executing as", vm.addr(l1ProxyAdminOwnerPk));
+
+        string memory version = systemConfig.version();
+        console.log("Systemconfig version:", version);
+
+        address owner = systemConfig.owner();
+        console.log("Systemconfig owner:", owner);
+
+        uint32 basefeeScalar = systemConfig.basefeeScalar();
+        console.log("Systemconfig basefeeScalar:", basefeeScalar);
+
+        uint32 blobbasefeeScalar = systemConfig.blobbasefeeScalar();
+        console.log("Systemconfig blobbasefeeScalar:", blobbasefeeScalar);
+
+        bytes32 batcherHash = systemConfig.batcherHash();
+        console.log("Systemconfig batcherHash:", uint256(batcherHash));
+
+        uint64 gasLimit = systemConfig.gasLimit();
+        console.log("Systemconfig gasLimit:", gasLimit);
+
+        address unsafeBlockSigner = systemConfig.unsafeBlockSigner();
+        console.log("Systemconfig unsafeBlockSigner:", unsafeBlockSigner);
+
+        IResourceMetering.ResourceConfig memory resourceConfig = systemConfig.resourceConfig();
+        console.log("Systemconfig resourceConfig elasticityMultiplier", resourceConfig.elasticityMultiplier);
+
+        address batchInbox = systemConfig.batchInbox();
+        console.log("Systemconfig batchInbox:", batchInbox);
+
+        (address gasTokenAddr, ) = systemConfig.gasPayingToken();
+        ISystemConfig.Addresses memory addresses = ISystemConfig.Addresses({
+            l1CrossDomainMessenger: address(
+                uint160(uint256(vm.load(address(systemConfig), systemConfig.L1_CROSS_DOMAIN_MESSENGER_SLOT())))
+            ),
+            l1ERC721Bridge: address(
+                uint160(uint256(vm.load(address(systemConfig), systemConfig.L1_ERC_721_BRIDGE_SLOT())))
+            ),
+            l1StandardBridge: address(
+                uint160(uint256(vm.load(address(systemConfig), systemConfig.L1_STANDARD_BRIDGE_SLOT())))
+            ),
+            disputeGameFactory: address(
+                uint160(uint256(vm.load(address(systemConfig), systemConfig.DISPUTE_GAME_FACTORY_SLOT())))
+            ),
+            optimismPortal: address(
+                uint160(uint256(vm.load(address(systemConfig), systemConfig.OPTIMISM_PORTAL_SLOT())))
+            ),
+            optimismMintableERC20Factory: address(
+                uint160(uint256(vm.load(address(systemConfig), systemConfig.OPTIMISM_MINTABLE_ERC20_FACTORY_SLOT())))
+            ),
+            gasPayingToken: gasTokenAddr
+        });
+
+        console.log("Systemconfig addresses l1CrossDomainMessenger:", addresses.l1CrossDomainMessenger);
+        console.log("Systemconfig addresses l1ERC721Bridge:", addresses.l1ERC721Bridge);
+        console.log("Systemconfig addresses l1StandardBridge:", addresses.l1StandardBridge);
+        console.log("Systemconfig addresses disputeGameFactory:", addresses.disputeGameFactory);
+        console.log("Systemconfig addresses optimismPortal:", addresses.optimismPortal);
+        console.log("Systemconfig addresses optimismMintableERC20Factory:", addresses.optimismMintableERC20Factory);
+        console.log("Systemconfig addresses gasPayingToken:", addresses.gasPayingToken);
+
+        GasToken gasToken = new GasToken(owner);
+
+        console.log("Gas contract deployed at", address(gasToken));
+        addresses.gasPayingToken = address(gasToken);
+
+        StorageSetter storageSetter = new StorageSetter();
+        console.log("StorageSetter deployed at", address(storageSetter));
+
+        address systemConfigImplementationAddr = opProxyAdmin.getProxyImplementation(address(systemConfig));
+        console.log("Current systemConfig implementation address", systemConfigImplementationAddr);
+
+        // Clear systemconfig initialization slot
+        StorageSetter.Slot[] memory slotsToWrite = new StorageSetter.Slot[](1);
+        slotsToWrite[0] = StorageSetter.Slot({ key: bytes32(0), value: bytes32(0) });
+
+        // Upgrade and clear initialization
+        bytes memory clearInitializedData = abi.encodeCall(
+            IProxyAdmin.upgradeAndCall,
+            (
+                payable(address(systemConfig)),
+                address(storageSetter),
+                abi.encodeWithSignature("setBytes32((bytes32,bytes32)[])", slotsToWrite)
+            )
+        );
+
+        (bool success, ) = address(opProxyAdmin).call(clearInitializedData);
+        require(success, "Unable to clear SystemConfig proxy initialization");
+
+        uint256 initializedValue = StorageSetter(address(systemConfig)).getUint(0);
+
+        console.log("Cleared systemconfig initialized flag, new value", initializedValue);
+
+        // Revert to initial implementation and initialize
+        bytes memory upgradeAndInitializeData = abi.encodeCall(
+            IProxyAdmin.upgradeAndCall,
+            (
+                payable(address(systemConfig)),
+                systemConfigImplementationAddr,
+                abi.encodeCall(
+                    ISystemConfig.initialize,
+                    (
+                        owner,
+                        basefeeScalar,
+                        blobbasefeeScalar,
+                        batcherHash,
+                        gasLimit,
+                        unsafeBlockSigner,
+                        resourceConfig,
+                        batchInbox,
+                        addresses
+                    )
+                )
+            )
+        );
+
+        (success, ) = address(opProxyAdmin).call(upgradeAndInitializeData);
+        console.log("succ", success);
+        require(success, "Unable to upgrade and reinitialize SystemConfig proxy");
+
+        console.log("System config reinitialized");
+
+        console.log("Initialized flag", uint256(vm.load(address(systemConfig), 0)));
+
+        vm.stopBroadcast();
+    }
+}
+
+interface IOwnableUpgradeable {
+    function owner() external view returns (address);
+}
+
+interface ISystemConfig is IOwnableUpgradeable {
+    function VERSION() external view returns (uint256);
+
+    function overhead() external view returns (uint256);
+
+    function scalar() external view returns (uint256);
+
+    function batcherHash() external view returns (bytes32);
+
+    function gasLimit() external view returns (uint64);
+
+    function basefeeScalar() external view returns (uint32);
+
+    function blobbasefeeScalar() external view returns (uint32);
+
+    function eip1559Denominator() external view returns (uint32);
+
+    function eip1559Elasticity() external view returns (uint32);
+
+    function version() external pure returns (string memory);
+
+    function minimumGasLimit() external view returns (uint64);
+
+    function maximumGasLimit() external pure returns (uint64);
+
+    function unsafeBlockSigner() external view returns (address);
+
+    function l1CrossDomainMessenger() external view returns (address);
+
+    function l1ERC721Bridge() external view returns (address);
+
+    function l1StandardBridge() external view returns (address);
+
+    function disputeGameFactory() external view returns (address);
+
+    function optimismPortal() external view returns (address);
+
+    function optimismMintableERC20Factory() external view returns (address);
+
+    function batchInbox() external view returns (address);
+
+    function startBlock() external view returns (uint256);
+
+    function isCustomGasToken() external view returns (bool);
+
+    function gasPayingToken() external view returns (address addr_, uint8 decimals_);
+
+    function gasPayingTokenName() external view returns (string memory);
+
+    function gasPayingTokenSymbol() external view returns (string memory);
+
+    function resourceConfig() external view returns (IResourceMetering.ResourceConfig memory);
+
+    function UNSAFE_BLOCK_SIGNER_SLOT() external view returns (bytes32);
+
+    function L1_CROSS_DOMAIN_MESSENGER_SLOT() external view returns (bytes32);
+
+    function L1_ERC_721_BRIDGE_SLOT() external view returns (bytes32);
+
+    function L1_STANDARD_BRIDGE_SLOT() external view returns (bytes32);
+
+    function OPTIMISM_PORTAL_SLOT() external view returns (bytes32);
+
+    function OPTIMISM_MINTABLE_ERC20_FACTORY_SLOT() external view returns (bytes32);
+
+    function BATCH_INBOX_SLOT() external view returns (bytes32);
+
+    function START_BLOCK_SLOT() external view returns (bytes32);
+
+    function DISPUTE_GAME_FACTORY_SLOT() external view returns (bytes32);
+
+    struct Addresses {
+        address l1CrossDomainMessenger;
+        address l1ERC721Bridge;
+        address l1StandardBridge;
+        address disputeGameFactory;
+        address optimismPortal;
+        address optimismMintableERC20Factory;
+        address gasPayingToken;
+    }
+
+    function initialize(
+        address _owner,
+        uint32 _basefeeScalar,
+        uint32 _blobbasefeeScalar,
+        bytes32 _batcherHash,
+        uint64 _gasLimit,
+        address _unsafeBlockSigner,
+        IResourceMetering.ResourceConfig memory _config,
+        address _batchInbox,
+        ISystemConfig.Addresses memory _addresses
+    ) external;
+}
+
+interface IResourceMetering {
+    struct ResourceParams {
+        uint128 prevBaseFee;
+        uint64 prevBoughtGas;
+        uint64 prevBlockNum;
+    }
+
+    struct ResourceConfig {
+        uint32 maxResourceLimit;
+        uint8 elasticityMultiplier;
+        uint8 baseFeeMaxChangeDenominator;
+        uint32 minimumBaseFee;
+        uint32 systemTxMaxGas;
+        uint128 maximumBaseFee;
+    }
+
+    error OutOfGas();
+
+    event Initialized(uint8 version);
+
+    function params() external view returns (uint128 prevBaseFee, uint64 prevBoughtGas, uint64 prevBlockNum); // nosemgrep
+
+    function __constructor__() external;
+}
+
+interface IOwnable {
+    function owner() external view returns (address);
+}
+
+interface IProxyAdmin is IOwnable {
+    event OwnershipTransferred(address indexed previousOwner, address indexed newOwner);
+
+    function addressManager() external view returns (address);
+
+    function changeProxyAdmin(address _proxy, address _newAdmin) external;
+
+    function getProxyAdmin(address _proxy) external view returns (address);
+
+    function getProxyImplementation(address _proxy) external view returns (address);
+
+    function implementationName(address) external view returns (string memory);
+
+    function isUpgrading() external view returns (bool);
+
+    function owner() external view returns (address);
+
+    function proxyType(address) external view returns (uint8);
+
+    function renounceOwnership() external;
+
+    function setAddress(string memory _name, address _address) external;
+
+    function setAddressManager(address _address) external;
+
+    function setImplementationName(address _address, string memory _name) external;
+
+    function setProxyType(address _address, uint8 _type) external;
+
+    function setUpgrading(bool _upgrading) external;
+
+    function transferOwnership(address newOwner) external;
+
+    function upgrade(address _proxy, address _implementation) external;
+
+    function upgradeAndCall(address _proxy, address _implementation, bytes memory _data) external payable;
+}
+
+interface IProxy {
+    event Upgraded(address indexed implementation);
+    event AdminChanged(address previousAdmin, address newAdmin);
+
+    function upgradeTo(address _implementation) external;
+
+    function upgradeToAndCall(address _implementation, bytes calldata _data) external payable returns (bytes memory);
+
+    function changeAdmin(address _admin) external;
+
+    function admin() external returns (address);
+
+    function implementation() external returns (address);
+
+    receive() external payable;
+
+    fallback() external payable;
+}

@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: ISC
-pragma solidity ^0.8.15;
+pragma solidity ^0.8.0;
 
 import { BaseScript } from "frax-std/BaseScript.sol";
 import { console } from "frax-std/FraxTest.sol";
@@ -53,7 +53,7 @@ contract DeployVestedFXS is BaseScript {
         string memory network = vm.envString("NETWORK");
         // TODO: update the env variables
         // if (Strings.equal(network, Constants.FraxtalDeployment.MAINNET)) {
-        //     eventualAdmin = Constants.FraxtalMainnet.PROXY_ADMIN;
+        //     eventualAdmin = Constants.FraxtalMainnet.PROXY_ADMIN_CORE8_FC01FC08;
         //     token = Constants.FraxtalMainnet.FXS_ERC20;
         // } else if (Strings.equal(network, Constants.FraxtalDeployment.TESTNET)) {
         //     eventualAdmin = Constants.FraxtalTestnet.PROXY_ADMIN; // TODO: @alex confirm these proxy admins

@@ -10,6 +10,7 @@
     "test": "forge test",
     "prepare": "husky install",
     "format": "forge fmt src && prettier --config ./.prettierrc.json --write src && forge fmt test && prettier --config ./.prettierrc.json --write test",
+    "generate:tsc": "tsc",
     "generate:constants": "ts-node -T scripts/generateConstants.ts"
   },
   "author": "Frax Finance",
@@ -25,13 +26,14 @@
     "typescript": "^5.2.2"
   },
   "dependencies": {
-    "@openzeppelin-4/contracts": "npm:@openzeppelin/contracts@4.9.3",
-    "@openzeppelin-5/contracts": "npm:@openzeppelin/contracts@5.0.2",
-    "@openzeppelin/contracts": "4.7.3",
-    "@openzeppelin/contracts-upgradeable": "4.7.3",
+    "@openzeppelin-4/contracts": "npm:@openzeppelin/contracts@4.9.6",
+    "@openzeppelin-5/contracts": "npm:@openzeppelin/contracts@5.2.0",
+    "@openzeppelin/contracts-upgradeable": "4.9.6",
+    "@openzeppelin/contracts-upgradeable-5": "npm:@openzeppelin/contracts-upgradeable@5.2.0",
     "@rari-capital/solmate": "https://github.com/rari-capital/solmate.git#8f9b23f8838670afda0fd8983f2c41e8037ae6bc",
     "clones-with-immutable-args": "https://github.com/Saw-mon-and-Natalie/clones-with-immutable-args.git#105efee1b9127ed7f6fedf139e1fc796ce8791f2",
     "dotenv": "^16.4.5",
-    "ethers": "^5.4.0"
+    "ethers": "^5.4.0",
+    "viem": "^2.23.1"
   }
 }

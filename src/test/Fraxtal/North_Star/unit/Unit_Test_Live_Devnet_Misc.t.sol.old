@@ -1,0 +1,39 @@
+// SPDX-License-Identifier: ISC
+pragma solidity ^0.8.0;
+
+import { LiveDevnetBaseTest } from "../LiveDevnetBaseTest.t.sol";
+
+import { AddressAliasHelper } from "@eth-optimism/contracts-bedrock/src/vendor/AddressAliasHelper.sol";
+import { console } from "frax-std/FraxTest.sol";
+import { Encoding } from "src/contracts/Fraxtal/libraries/Encoding.sol";
+import { VmSafe } from "forge-std/Vm.sol";
+
+contract Unit_Test_Live_Devnet_Misc is LiveDevnetBaseTest {
+    function defaultSetup() internal {
+        super.setUp();
+    }
+
+    function test_L1NativeERC20_to_L2BridgedIOUERC20() public {
+        defaultSetup();
+
+        // Get the caller
+        address caller = AddressAliasHelper.applyL1ToL2Alias(address(messengerPxy));
+
+        // Relay
+        {
+            vm.prank(caller);
+
+            uint256 nonce = Encoding.encodeVersionedNonce(1, 1); // (nonce, version)
+            console.log("-----nonce-----");
+            console.logBytes32(bytes32(nonce));
+
+            l2CrossDomainMessenger.relayMessage(nonce, address(L1Token), address(L2Token), 15e18, 200_000, hex"123456");
+        }
+    }
+
+    // function test_L1NativeERC20_to_L2BridgedIOUERC20() public {
+    //     defaultSetup();
+
+    //     // Need to do dispute game stuff
+    // }
+}
