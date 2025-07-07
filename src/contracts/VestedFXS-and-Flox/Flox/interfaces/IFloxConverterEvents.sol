@@ -56,10 +56,15 @@ contract IFloxConverterEvents {
      */
     event OperationPaused(bool paused, uint256 timestamp);
     /**
-     * @notice Emitted when a redeemal epoch is finalized.
-     * @param epochId ID of the finalized redeemal epoch
+     * @notice Emitted when FRAX is recovered from the smart contract.
+     * @param amount Amount of FRAX recovered from the contract
      */
-    event RedeemalEpochFinalized(uint256 epochId);
+    event RecoveredFrax(uint256 amount);
+    /**
+     * @notice Emitted when a redemption epoch is finalized.
+     * @param epochId ID of the finalized redemption epoch
+     */
+    event RedemptionEpochFinalized(uint256 epochId);
     /**
      * @notice Emitted when a new epoch is initiated.
      * @param epochId The ID of the epoch
@@ -67,15 +72,15 @@ contract IFloxConverterEvents {
      * @param lastBlock The block number of the last block of the epoch
      * @param totalFraxDistributed The total amount of FRAX distributed in the epoch
      */
-    event RedeemalEpochInitiated(uint256 epochId, uint64 firstBlock, uint64 lastBlock, uint256 totalFraxDistributed);
+    event RedemptionEpochInitiated(uint256 epochId, uint64 firstBlock, uint64 lastBlock, uint256 totalFraxDistributed);
     /**
-     * @notice Emitted when the redeemal epoch data has been populated and is ready for distribution.
-     * @param epochId ID of the redeemal epoch
-     * @param firstEpochBlock First block number of the redeemal epoch
-     * @param lastEpochBlock Last block number of the redeemal epoch
-     * @param totalFloxStakeUnits Amount of total Flox stake units submitted in the redeemal epoch
+     * @notice Emitted when the redemption epoch data has been populated and is ready for distribution.
+     * @param epochId ID of the redemption epoch
+     * @param firstEpochBlock First block number of the redemption epoch
+     * @param lastEpochBlock Last block number of the redemption epoch
+     * @param totalFloxStakeUnits Amount of total Flox stake units submitted in the redemption epoch
      */
-    event RedeemalEpochPopulated(
+    event RedemptionEpochPopulated(
         uint256 epochId,
         uint256 firstEpochBlock,
         uint256 lastEpochBlock,
@@ -102,11 +107,11 @@ contract IFloxConverterEvents {
      */
     event StakeWithdrawalInitiated(address indexed staker, uint256 stake, uint256 withdrawalTimestamp);
     /**
-     * @notice Emmited when the user's redeemal epoch data is updated.
-     * @param epochId ID of the redeemal epoch
+     * @notice Emmited when the user's redemption epoch data is updated.
+     * @param epochId ID of the redemption epoch
      * @param user Address of the user having their data updated
-     * @param fxtlPointsRedeemed Amount of FXTL points redeemed in the redeemal epoch
-     * @param floxStakeUnits Amount of Flox stake units by the user in the redeemal epoch
+     * @param fxtlPointsRedeemed Amount of FXTL points redeemed in the redemption epoch
+     * @param floxStakeUnits Amount of Flox stake units by the user in the redemption epoch
      */
     event UserEpochDataUpdated(
         uint256 indexed epochId,

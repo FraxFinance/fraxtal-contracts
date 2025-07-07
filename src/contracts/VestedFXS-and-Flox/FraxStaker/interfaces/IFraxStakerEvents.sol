@@ -18,22 +18,9 @@ pragma solidity >=0.8.0;
 /**
  * @title IFraxStakerEvents
  * @author Frax Finance
- * @notice A collection of events used by the FRAX Staking system.
+ * @notice A collection of events used by the FraxStaker system.
  */
 contract IFraxStakerEvents {
-    /**
-     * @notice Emitted when a staker initiates withdrawal of the delegatted stake to nodify the delegatee of the action.
-     * @param staker The address of the staker
-     * @param delegatee The address of the delegatee
-     * @param amount The amount of FRAX staked
-     * @param withdrawalTimestamp The timestamp at which the withdrawal will be available and the delegation will be revoked
-     */
-    event DelegationRevocationInitiated(
-        address indexed staker,
-        address indexed delegatee,
-        uint256 amount,
-        uint256 withdrawalTimestamp
-    );
     /**
      * @notice Emitted when a contributor is added.
      * @param contributor The address of the contributor
@@ -72,6 +59,11 @@ contract IFraxStakerEvents {
      * @param timestamp The timestamp at which the pause or unpause occurred
      */
     event OperationPaused(bool paused, uint256 timestamp);
+    /**
+     * @notice Emitted when FRAX is recovered from the smart contract.
+     * @param amount The amount of FRAX recovered
+     */
+    event RecoveredFrax(uint256 amount);
     /**
      * @notice Emitted when a stake is slashed.
      * @param staker The address of the staker

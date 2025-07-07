@@ -18,7 +18,7 @@ pragma solidity >=0.8.0;
  * @notice A collection of errors used by the FloxCAP system.
  */
 interface IFloxConverterErrors {
-    /// Emitted the user already received their FRAX distribution for the current redeemal epoch.
+    /// Emitted the user already received their FRAX distribution for the current redemption epoch.
     /// @param user The address of the user that already received their distribution
     error AlreadyDistributed(address user);
 
@@ -65,26 +65,29 @@ interface IFloxConverterErrors {
     /// Emitted when attempting to pass arrays of different lengths.
     error InvalidArrayLength();
 
-    /// Emitted when passing a zero amount of FRAX redeemed for the redeemal epoch.
+    /// Emitted when passing a zero amount of FRAX redeemed for the redemption epoch.
     error InvalidFraxRedeemedAmount();
 
-    /// Emitted when passing a zero amount of FXTL points redeemed for the redeemal epoch.
+    /// Emitted when passing a zero amount of FXTL points redeemed for the redemption epoch.
     error InvalidFxtlPointsAmount();
 
-    /// Emitted when trying to pass a zero amount as the last block number of the redeemal epoch.
+    /// Emitted when trying to pass a zero amount as the last block number of the redemption epoch.
     error InvalidLastBlockNumber();
 
     /// Emitted when attempting to create a stake with a zero amount.
     error InvalidStakeAmount();
 
-    /// Emitted when attempting to pass a zero amount of Flox stake units when initiating a redeemal epoch.
+    /// Emitted when attempting to pass a zero amount of Flox stake units when initiating a redemption epoch.
     error InvalidTotalFloxStakeUnitsAmount();
 
     /// Emitted when the divisor for veFRAX is invalid.
     error InvalidVeFRAXDivisor();
 
-    /// Emitted when the owner tries to remove a Flox contributor that is not a Flox contributor.
+    /// Emitted when either 1) The sender is not a flox contributor or 2) the owner tries to remove a Flox contributor that is not an existing Flox contributor.
     error NotFloxContributor();
+
+    /// Emitted when the caller is not the owner or Flox contributor.
+    error NotOwnerOrFloxContributor();
 
     /// Emitted when the contract is not using veFRAX balances.
     error NotUsingVeFRAX();
@@ -92,11 +95,14 @@ interface IFloxConverterErrors {
     /// Emitted when reentrancy is detected.
     error Reentrancy();
 
-    /// Emitted when attempting to get the data for an uninitiated redeemal epoch.
-    error UninitiatedRedeemalEpoch();
+    /// Emitted when FRAX transfer fails.
+    error TransferFailed();
 
-    /// Emitted when attempting to update user redeemal epoch data when the user's redeemal epoch data has already been set.
-    error UserRedeemalDataAlreadyPresent();
+    /// Emitted when attempting to get the data for an uninitiated redemption epoch.
+    error UninitiatedRedemptionEpoch();
+
+    /// Emitted when attempting to update user redemption epoch data when the user's redemption epoch data has already been set.
+    error UserRedemptionDataAlreadyPresent();
 
     /// Emitted when a user tries to deposit FRAX while they aleady have a stake with initiated withdrawal.
     /// They need to either cancel the withdrawal or wait for it to finish.

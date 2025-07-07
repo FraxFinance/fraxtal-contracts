@@ -4,6 +4,7 @@ pragma solidity >=0.8.0;
 import { BaseTestVeFXS } from "../BaseTestVeFXS.t.sol";
 import { MintableBurnableTestERC20 } from "src/test/VestedFXS-and-Flox/helpers/MintableBurnableTestERC20.sol";
 import { FloxConverter, FloxConverterStructs } from "src/contracts/VestedFXS-and-Flox/Flox/FloxConverter.sol";
+import { FloxCapacitor } from "src/contracts/VestedFXS-and-Flox/Flox/FloxCapacitor.sol";
 import { OwnedUpgradeable } from "src/contracts/VestedFXS-and-Flox/Flox/OwnedUpgradeable.sol";
 import { VeFXSAggregator } from "src/contracts/VestedFXS-and-Flox/VestedFXS/VeFXSAggregator.sol";
 import { console } from "frax-std/FraxTest.sol";
@@ -14,12 +15,15 @@ contract Unit_Test_FloxConverter is BaseTestVeFXS, FloxConverterStructs, OwnedUp
         console.log("defaultSetup() called");
         super.defaultSetup();
 
-        // Mint FXS to the test users
-        token.mint(alice, 100e18);
-        token.mint(bob, 100e18);
+        // Mint FXTL points to the test users
+        token.mint(alice, 1e6);
+        token.mint(bob, 1e6);
 
         // Set frank as the Flox contributor
         floxConverter.addFloxContributor(frank);
+
+        vm.expectRevert(AlreadyInitialized.selector);
+        floxConverter.initialize(bob, address(floxCap), address(token), "FloxConverter_v2.0.0");
     }
 
     function test_commitTransferOwnership() public {
@@ -157,20 +161,20 @@ contract Unit_Test_FloxConverter is BaseTestVeFXS, FloxConverterStructs, OwnedUp
         assertEq(floxConverter.weeklyAvailableFrax(), expectedWeeklyAvailableFrax);
     }
 
-    function test_getCurrentUserRedeemalEpochFxtlPoints() public {
+    function test_getCurrentUserRedemptionEpochFxtlPoints() public {
         floxCapSetup();
 
-        assertEq(floxConverter.getCurrentUserRedeemalEpochFxtlPoints(alice), 2e18);
-        assertEq(floxConverter.getCurrentUserRedeemalEpochFxtlPoints(bob), 2e18);
+        assertEq(floxConverter.getCurrentUserRedemptionEpochFxtlPoints(alice), 2e4);
+        assertEq(floxConverter.getCurrentUserRedemptionEpochFxtlPoints(bob), 2e4);
 
-        token.mint(alice, 100e18);
-        token.mint(bob, 100e17);
+        token.mint(alice, 1e6);
+        token.mint(bob, 1e5);
 
-        assertEq(floxConverter.getCurrentUserRedeemalEpochFxtlPoints(alice), 4e18);
-        assertEq(floxConverter.getCurrentUserRedeemalEpochFxtlPoints(bob), 22e17);
+        assertEq(floxConverter.getCurrentUserRedemptionEpochFxtlPoints(alice), 4e4);
+        assertEq(floxConverter.getCurrentUserRedemptionEpochFxtlPoints(bob), 22e3);
     }
 
-    function test_bulkGetCurrentUserRedeemalEpochFxtlPoints() public {
+    function test_bulkGetCurrentUserRedemptionEpochFxtlPoints() public {
         floxCapSetup();
 
         address[] memory users = new address[](2);
@@ -179,16 +183,66 @@ contract Unit_Test_FloxConverter is BaseTestVeFXS, FloxConverterStructs, OwnedUp
 
         uint256[] memory fxtlPoints = new uint256[](2);
 
-        fxtlPoints = floxConverter.bulkGetCurrentUserRedeemalEpochFxtlPoints(users);
-        assertEq(fxtlPoints[0], 2e18);
-        assertEq(fxtlPoints[1], 2e18);
+        fxtlPoints = floxConverter.bulkGetCurrentUserRedemptionEpochFxtlPoints(users);
+        assertEq(fxtlPoints[0], 2e4);
+        assertEq(fxtlPoints[1], 2e4);
 
-        token.mint(alice, 100e18);
-        token.mint(bob, 100e17);
+        token.mint(alice, 1e6);
+        token.mint(bob, 1e5);
 
-        fxtlPoints = floxConverter.bulkGetCurrentUserRedeemalEpochFxtlPoints(users);
-        assertEq(fxtlPoints[0], 4e18);
-        assertEq(fxtlPoints[1], 22e17);
+        fxtlPoints = floxConverter.bulkGetCurrentUserRedemptionEpochFxtlPoints(users);
+        assertEq(fxtlPoints[0], 4e4);
+        assertEq(fxtlPoints[1], 22e3);
+    }
+
+    function test_calculateFloxStakeUnits() public {
+        floxCapSetup();
+
+        vm.mockCall(address(floxConverter.FLOX_CAPACITOR()), abi.encodeWithSelector(FloxCapacitor.balanceOf.selector, address(alice)), abi.encode(10e18));
+
+        vm.mockCall(address(floxConverter.FLOX_CAPACITOR()), abi.encodeWithSelector(FloxCapacitor.balanceOf.selector, address(bob)), abi.encode(0));
+
+        vm.mockCall(address(floxConverter.FLOX_CAPACITOR()), abi.encodeWithSelector(FloxCapacitor.balanceOf.selector, claire), abi.encode(20e18));
+
+        vm.mockCall(address(floxConverter.FLOX_CAPACITOR()), abi.encodeWithSelector(FloxCapacitor.balanceOf.selector, dave), abi.encode(100e18));
+
+        token.mint(claire, 1e6);
+        token.mint(dave, 1e6);
+
+        assertEq(floxConverter.calculateFloxStakeUnits(alice), 3e4);
+        assertEq(floxConverter.calculateFloxStakeUnits(bob), 2e4);
+        assertEq(floxConverter.calculateFloxStakeUnits(claire), 4e4);
+        assertEq(floxConverter.calculateFloxStakeUnits(dave), 4e4);
+        assertEq(floxConverter.calculateFloxStakeUnits(frank), 0);
+    }
+
+    function test_bulkCalculateFloxStakeUnits() public {
+        floxCapSetup();
+
+        vm.mockCall(address(floxConverter.FLOX_CAPACITOR()), abi.encodeWithSelector(FloxCapacitor.balanceOf.selector, address(alice)), abi.encode(10e18));
+
+        vm.mockCall(address(floxConverter.FLOX_CAPACITOR()), abi.encodeWithSelector(FloxCapacitor.balanceOf.selector, address(bob)), abi.encode(0));
+
+        vm.mockCall(address(floxConverter.FLOX_CAPACITOR()), abi.encodeWithSelector(FloxCapacitor.balanceOf.selector, claire), abi.encode(20e18));
+
+        vm.mockCall(address(floxConverter.FLOX_CAPACITOR()), abi.encodeWithSelector(FloxCapacitor.balanceOf.selector, dave), abi.encode(100e18));
+
+        token.mint(claire, 1e6);
+        token.mint(dave, 1e6);
+
+        address[] memory users = new address[](5);
+        users[0] = alice;
+        users[1] = bob;
+        users[2] = claire;
+        users[3] = dave;
+        users[4] = frank;
+
+        uint256[] memory floxStakeUnits = floxConverter.bulkCalculateFloxStakeUnits(users);
+        assertEq(floxStakeUnits[0], 3e4);
+        assertEq(floxStakeUnits[1], 2e4);
+        assertEq(floxStakeUnits[2], 4e4);
+        assertEq(floxStakeUnits[3], 4e4);
+        assertEq(floxStakeUnits[4], 0);
     }
 
     function test_getFraxAllocationFromFloxStakeUnits() public {
@@ -200,21 +254,21 @@ contract Unit_Test_FloxConverter is BaseTestVeFXS, FloxConverterStructs, OwnedUp
         hoax(frank);
         floxConverter.updateUserData(alice, 2e18, 42);
 
-        RedeemalEpoch memory redeemalEpoch;
+        RedemptionEpoch memory redemptionEpoch;
 
         hoax(frank);
-        floxConverter.initiateRedeemalEpoch(1000);
+        floxConverter.initiateRedemptionEpoch(1000);
 
-        (redeemalEpoch.initiated, redeemalEpoch.populated, redeemalEpoch.finalized, redeemalEpoch.firstBlock, redeemalEpoch.lastBlock, redeemalEpoch.totalFxtlPointsRedeemed, redeemalEpoch.totalFraxDistributed, redeemalEpoch.totalFloxStakeUnits) = floxConverter.redeemalEpochs(1);
+        (redemptionEpoch.initiated, redemptionEpoch.populated, redemptionEpoch.finalized, redemptionEpoch.firstBlock, redemptionEpoch.lastBlock, redemptionEpoch.totalFxtlPointsRedeemed, redemptionEpoch.totalFraxDistributed, redemptionEpoch.totalFloxStakeUnits) = floxConverter.redemptionEpochs(1);
 
-        assertTrue(redeemalEpoch.initiated);
-        assertFalse(redeemalEpoch.populated);
-        assertFalse(redeemalEpoch.finalized);
-        assertEq(redeemalEpoch.firstBlock, 1);
-        assertEq(redeemalEpoch.lastBlock, 1000);
-        assertEq(redeemalEpoch.totalFxtlPointsRedeemed, 0);
-        assertEq(redeemalEpoch.totalFraxDistributed, 0);
-        assertEq(redeemalEpoch.totalFloxStakeUnits, 0);
+        assertTrue(redemptionEpoch.initiated);
+        assertFalse(redemptionEpoch.populated);
+        assertFalse(redemptionEpoch.finalized);
+        assertEq(redemptionEpoch.firstBlock, 1);
+        assertEq(redemptionEpoch.lastBlock, 1000);
+        assertEq(redemptionEpoch.totalFxtlPointsRedeemed, 0);
+        assertEq(redemptionEpoch.totalFraxDistributed, 0);
+        assertEq(redemptionEpoch.totalFloxStakeUnits, 0);
 
         vm.expectEmit(true, false, false, true);
         emit UserStatsUpdated(alice, 0, 2e18);
@@ -223,18 +277,18 @@ contract Unit_Test_FloxConverter is BaseTestVeFXS, FloxConverterStructs, OwnedUp
         hoax(frank);
         floxConverter.updateUserData(alice, 2e18, 42);
 
-        (redeemalEpoch.initiated, redeemalEpoch.populated, redeemalEpoch.finalized, redeemalEpoch.firstBlock, redeemalEpoch.lastBlock, redeemalEpoch.totalFxtlPointsRedeemed, redeemalEpoch.totalFraxDistributed, redeemalEpoch.totalFloxStakeUnits) = floxConverter.redeemalEpochs(1);
+        (redemptionEpoch.initiated, redemptionEpoch.populated, redemptionEpoch.finalized, redemptionEpoch.firstBlock, redemptionEpoch.lastBlock, redemptionEpoch.totalFxtlPointsRedeemed, redemptionEpoch.totalFraxDistributed, redemptionEpoch.totalFloxStakeUnits) = floxConverter.redemptionEpochs(1);
 
-        assertTrue(redeemalEpoch.initiated);
-        assertFalse(redeemalEpoch.populated);
-        assertFalse(redeemalEpoch.finalized);
-        assertEq(redeemalEpoch.firstBlock, 1);
-        assertEq(redeemalEpoch.lastBlock, 1000);
-        assertEq(redeemalEpoch.totalFxtlPointsRedeemed, 2e18);
-        assertEq(redeemalEpoch.totalFraxDistributed, 0);
-        assertEq(redeemalEpoch.totalFloxStakeUnits, 42);
+        assertTrue(redemptionEpoch.initiated);
+        assertFalse(redemptionEpoch.populated);
+        assertFalse(redemptionEpoch.finalized);
+        assertEq(redemptionEpoch.firstBlock, 1);
+        assertEq(redemptionEpoch.lastBlock, 1000);
+        assertEq(redemptionEpoch.totalFxtlPointsRedeemed, 2e18);
+        assertEq(redemptionEpoch.totalFraxDistributed, 0);
+        assertEq(redemptionEpoch.totalFloxStakeUnits, 42);
 
-        vm.expectRevert(UninitiatedRedeemalEpoch.selector);
+        vm.expectRevert(UninitiatedRedemptionEpoch.selector);
         floxConverter.getFraxAllocationFromFloxStakeUnits(42, 2);
 
         uint256 expectedWeeklyAvailableFrax = uint256(100_000_000_000_000_000_000 * 7 days) / 365 days;
@@ -245,55 +299,55 @@ contract Unit_Test_FloxConverter is BaseTestVeFXS, FloxConverterStructs, OwnedUp
         assertEq(projectedFraxAllocation, expectedWeeklyAvailableFrax / 2);
     }
 
-    function test_initiateRedeemalEpoch() public {
+    function test_initiateRedemptionEpoch() public {
         floxCapSetup();
 
         uint256 expectedWeeklyAvailableFrax = uint256(100_000_000_000_000_000_000 * 7 days) / 365 days;
         floxConverter.setYearlyFraxDistribution(100e18);
 
-        RedeemalEpoch memory redeemalEpoch;
+        RedemptionEpoch memory redemptionEpoch;
 
-        (redeemalEpoch.initiated, redeemalEpoch.populated, redeemalEpoch.finalized, redeemalEpoch.firstBlock, redeemalEpoch.lastBlock, redeemalEpoch.totalFxtlPointsRedeemed, redeemalEpoch.totalFraxDistributed, redeemalEpoch.totalFloxStakeUnits) = floxConverter.redeemalEpochs(1);
+        (redemptionEpoch.initiated, redemptionEpoch.populated, redemptionEpoch.finalized, redemptionEpoch.firstBlock, redemptionEpoch.lastBlock, redemptionEpoch.totalFxtlPointsRedeemed, redemptionEpoch.totalFraxDistributed, redemptionEpoch.totalFloxStakeUnits) = floxConverter.redemptionEpochs(1);
 
-        assertFalse(redeemalEpoch.initiated);
-        assertFalse(redeemalEpoch.populated);
-        assertFalse(redeemalEpoch.finalized);
-        assertEq(redeemalEpoch.firstBlock, 0);
-        assertEq(redeemalEpoch.lastBlock, 0);
-        assertEq(redeemalEpoch.totalFxtlPointsRedeemed, 0);
-        assertEq(redeemalEpoch.totalFraxDistributed, 0);
-        assertEq(redeemalEpoch.totalFloxStakeUnits, 0);
+        assertFalse(redemptionEpoch.initiated);
+        assertFalse(redemptionEpoch.populated);
+        assertFalse(redemptionEpoch.finalized);
+        assertEq(redemptionEpoch.firstBlock, 0);
+        assertEq(redemptionEpoch.lastBlock, 0);
+        assertEq(redemptionEpoch.totalFxtlPointsRedeemed, 0);
+        assertEq(redemptionEpoch.totalFraxDistributed, 0);
+        assertEq(redemptionEpoch.totalFloxStakeUnits, 0);
 
         vm.expectEmit(false, false, false, true);
-        emit RedeemalEpochInitiated(1, 1, 1000, expectedWeeklyAvailableFrax);
+        emit RedemptionEpochInitiated(1, 1, 1000, expectedWeeklyAvailableFrax);
         hoax(frank);
-        floxConverter.initiateRedeemalEpoch(1000);
+        floxConverter.initiateRedemptionEpoch(1000);
 
-        (redeemalEpoch.initiated, redeemalEpoch.populated, redeemalEpoch.finalized, redeemalEpoch.firstBlock, redeemalEpoch.lastBlock, redeemalEpoch.totalFxtlPointsRedeemed, redeemalEpoch.totalFraxDistributed, redeemalEpoch.totalFloxStakeUnits) = floxConverter.redeemalEpochs(1);
+        (redemptionEpoch.initiated, redemptionEpoch.populated, redemptionEpoch.finalized, redemptionEpoch.firstBlock, redemptionEpoch.lastBlock, redemptionEpoch.totalFxtlPointsRedeemed, redemptionEpoch.totalFraxDistributed, redemptionEpoch.totalFloxStakeUnits) = floxConverter.redemptionEpochs(1);
 
-        assertTrue(redeemalEpoch.initiated);
-        assertFalse(redeemalEpoch.populated);
-        assertFalse(redeemalEpoch.finalized);
-        assertEq(redeemalEpoch.firstBlock, 1);
-        assertEq(redeemalEpoch.lastBlock, 1000);
-        assertEq(redeemalEpoch.totalFxtlPointsRedeemed, 0);
-        assertEq(redeemalEpoch.totalFraxDistributed, 0);
-        assertEq(redeemalEpoch.totalFloxStakeUnits, 0);
+        assertTrue(redemptionEpoch.initiated);
+        assertFalse(redemptionEpoch.populated);
+        assertFalse(redemptionEpoch.finalized);
+        assertEq(redemptionEpoch.firstBlock, 1);
+        assertEq(redemptionEpoch.lastBlock, 1000);
+        assertEq(redemptionEpoch.totalFxtlPointsRedeemed, 0);
+        assertEq(redemptionEpoch.totalFraxDistributed, 0);
+        assertEq(redemptionEpoch.totalFloxStakeUnits, 0);
 
         vm.expectRevert(InvalidLastBlockNumber.selector);
         hoax(frank);
-        floxConverter.initiateRedeemalEpoch(0);
+        floxConverter.initiateRedemptionEpoch(0);
 
         vm.expectRevert(InvalidLastBlockNumber.selector);
         hoax(frank);
-        floxConverter.initiateRedeemalEpoch(uint64(block.number + 10));
+        floxConverter.initiateRedemptionEpoch(uint64(block.number + 10));
 
         hoax(frank);
         floxConverter.stopOperation();
 
         vm.expectRevert(ContractPaused.selector);
         hoax(frank);
-        floxConverter.initiateRedeemalEpoch(1000);
+        floxConverter.initiateRedemptionEpoch(1000);
     }
 
     function test_updateUserData() public {
@@ -303,26 +357,26 @@ contract Unit_Test_FloxConverter is BaseTestVeFXS, FloxConverterStructs, OwnedUp
         hoax(frank);
         floxConverter.updateUserData(alice, 2e18, 42);
 
-        RedeemalEpoch memory redeemalEpoch;
+        RedemptionEpoch memory redemptionEpoch;
 
         hoax(frank);
-        floxConverter.initiateRedeemalEpoch(1000);
+        floxConverter.initiateRedemptionEpoch(1000);
 
-        (redeemalEpoch.initiated, redeemalEpoch.populated, redeemalEpoch.finalized, redeemalEpoch.firstBlock, redeemalEpoch.lastBlock, redeemalEpoch.totalFxtlPointsRedeemed, redeemalEpoch.totalFraxDistributed, redeemalEpoch.totalFloxStakeUnits) = floxConverter.redeemalEpochs(1);
+        (redemptionEpoch.initiated, redemptionEpoch.populated, redemptionEpoch.finalized, redemptionEpoch.firstBlock, redemptionEpoch.lastBlock, redemptionEpoch.totalFxtlPointsRedeemed, redemptionEpoch.totalFraxDistributed, redemptionEpoch.totalFloxStakeUnits) = floxConverter.redemptionEpochs(1);
 
-        assertTrue(redeemalEpoch.initiated);
-        assertFalse(redeemalEpoch.populated);
-        assertFalse(redeemalEpoch.finalized);
-        assertEq(redeemalEpoch.firstBlock, 1);
-        assertEq(redeemalEpoch.lastBlock, 1000);
-        assertEq(redeemalEpoch.totalFxtlPointsRedeemed, 0);
-        assertEq(redeemalEpoch.totalFraxDistributed, 0);
-        assertEq(redeemalEpoch.totalFloxStakeUnits, 0);
+        assertTrue(redemptionEpoch.initiated);
+        assertFalse(redemptionEpoch.populated);
+        assertFalse(redemptionEpoch.finalized);
+        assertEq(redemptionEpoch.firstBlock, 1);
+        assertEq(redemptionEpoch.lastBlock, 1000);
+        assertEq(redemptionEpoch.totalFxtlPointsRedeemed, 0);
+        assertEq(redemptionEpoch.totalFraxDistributed, 0);
+        assertEq(redemptionEpoch.totalFloxStakeUnits, 0);
 
-        RedeemalEpochUserData memory epochUserData;
+        RedemptionEpochUserData memory epochUserData;
         UserData memory userData;
 
-        (epochUserData.fxtlPointsRedeemed, epochUserData.fraxReceived, epochUserData.floxStakeUnits) = floxConverter.redeemalEpochUserData(1, alice);
+        (epochUserData.fxtlPointsRedeemed, epochUserData.fraxReceived, epochUserData.floxStakeUnits) = floxConverter.redemptionEpochUserData(1, alice);
 
         (userData.totalFxtlPointsRedeemed, userData.totalFraxReceived) = floxConverter.userStats(alice);
 
@@ -339,7 +393,7 @@ contract Unit_Test_FloxConverter is BaseTestVeFXS, FloxConverterStructs, OwnedUp
         hoax(frank);
         floxConverter.updateUserData(alice, 2e18, 42);
 
-        (epochUserData.fxtlPointsRedeemed, epochUserData.fraxReceived, epochUserData.floxStakeUnits) = floxConverter.redeemalEpochUserData(1, alice);
+        (epochUserData.fxtlPointsRedeemed, epochUserData.fraxReceived, epochUserData.floxStakeUnits) = floxConverter.redemptionEpochUserData(1, alice);
 
         (userData.totalFxtlPointsRedeemed, userData.totalFraxReceived) = floxConverter.userStats(alice);
 
@@ -349,11 +403,11 @@ contract Unit_Test_FloxConverter is BaseTestVeFXS, FloxConverterStructs, OwnedUp
         assertEq(userData.totalFxtlPointsRedeemed, 2e18);
         assertEq(userData.totalFraxReceived, 0);
 
-        (,,,,, redeemalEpoch.totalFxtlPointsRedeemed, redeemalEpoch.totalFraxDistributed, redeemalEpoch.totalFloxStakeUnits) = floxConverter.redeemalEpochs(1);
+        (,,,,, redemptionEpoch.totalFxtlPointsRedeemed, redemptionEpoch.totalFraxDistributed, redemptionEpoch.totalFloxStakeUnits) = floxConverter.redemptionEpochs(1);
 
-        assertEq(redeemalEpoch.totalFxtlPointsRedeemed, 2e18);
-        assertEq(redeemalEpoch.totalFraxDistributed, 0);
-        assertEq(redeemalEpoch.totalFloxStakeUnits, 42);
+        assertEq(redemptionEpoch.totalFxtlPointsRedeemed, 2e18);
+        assertEq(redemptionEpoch.totalFraxDistributed, 0);
+        assertEq(redemptionEpoch.totalFloxStakeUnits, 42);
 
         vm.expectEmit(true, false, false, true);
         emit UserStatsUpdated(alice, 2e18, 1e18);
@@ -362,7 +416,7 @@ contract Unit_Test_FloxConverter is BaseTestVeFXS, FloxConverterStructs, OwnedUp
         hoax(frank);
         floxConverter.updateUserData(alice, 1e18, 100);
 
-        (epochUserData.fxtlPointsRedeemed, epochUserData.fraxReceived, epochUserData.floxStakeUnits) = floxConverter.redeemalEpochUserData(1, alice);
+        (epochUserData.fxtlPointsRedeemed, epochUserData.fraxReceived, epochUserData.floxStakeUnits) = floxConverter.redemptionEpochUserData(1, alice);
 
         (userData.totalFxtlPointsRedeemed, userData.totalFraxReceived) = floxConverter.userStats(alice);
 
@@ -372,11 +426,11 @@ contract Unit_Test_FloxConverter is BaseTestVeFXS, FloxConverterStructs, OwnedUp
         assertEq(userData.totalFxtlPointsRedeemed, 1e18);
         assertEq(userData.totalFraxReceived, 0);
 
-        (,,,,, redeemalEpoch.totalFxtlPointsRedeemed, redeemalEpoch.totalFraxDistributed, redeemalEpoch.totalFloxStakeUnits) = floxConverter.redeemalEpochs(1);
+        (,,,,, redemptionEpoch.totalFxtlPointsRedeemed, redemptionEpoch.totalFraxDistributed, redemptionEpoch.totalFloxStakeUnits) = floxConverter.redemptionEpochs(1);
 
-        assertEq(redeemalEpoch.totalFxtlPointsRedeemed, 1e18);
-        assertEq(redeemalEpoch.totalFraxDistributed, 0);
-        assertEq(redeemalEpoch.totalFloxStakeUnits, 100);
+        assertEq(redemptionEpoch.totalFxtlPointsRedeemed, 1e18);
+        assertEq(redemptionEpoch.totalFraxDistributed, 0);
+        assertEq(redemptionEpoch.totalFloxStakeUnits, 100);
 
         vm.expectRevert(InvalidFxtlPointsAmount.selector);
         hoax(frank);
@@ -387,7 +441,7 @@ contract Unit_Test_FloxConverter is BaseTestVeFXS, FloxConverterStructs, OwnedUp
         floxConverter.updateUserData(alice, 1e18, 100);
 
         hoax(frank);
-        floxConverter.markRedeemalEpochAsPopulated();
+        floxConverter.markRedemptionEpochAsPopulated();
 
         vm.expectRevert(EpochAlreadyPopulated.selector);
         hoax(frank);
@@ -417,26 +471,26 @@ contract Unit_Test_FloxConverter is BaseTestVeFXS, FloxConverterStructs, OwnedUp
         hoax(frank);
         floxConverter.bulkUpdateUserData(users, fxtlPoints, floxStakeUnits);
 
-        RedeemalEpoch memory redeemalEpoch;
+        RedemptionEpoch memory redemptionEpoch;
 
         hoax(frank);
-        floxConverter.initiateRedeemalEpoch(1000);
+        floxConverter.initiateRedemptionEpoch(1000);
 
-        (redeemalEpoch.initiated, redeemalEpoch.populated, redeemalEpoch.finalized, redeemalEpoch.firstBlock, redeemalEpoch.lastBlock, redeemalEpoch.totalFxtlPointsRedeemed, redeemalEpoch.totalFraxDistributed, redeemalEpoch.totalFloxStakeUnits) = floxConverter.redeemalEpochs(1);
+        (redemptionEpoch.initiated, redemptionEpoch.populated, redemptionEpoch.finalized, redemptionEpoch.firstBlock, redemptionEpoch.lastBlock, redemptionEpoch.totalFxtlPointsRedeemed, redemptionEpoch.totalFraxDistributed, redemptionEpoch.totalFloxStakeUnits) = floxConverter.redemptionEpochs(1);
 
-        assertTrue(redeemalEpoch.initiated);
-        assertFalse(redeemalEpoch.populated);
-        assertFalse(redeemalEpoch.finalized);
-        assertEq(redeemalEpoch.firstBlock, 1);
-        assertEq(redeemalEpoch.lastBlock, 1000);
-        assertEq(redeemalEpoch.totalFxtlPointsRedeemed, 0);
-        assertEq(redeemalEpoch.totalFraxDistributed, 0);
-        assertEq(redeemalEpoch.totalFloxStakeUnits, 0);
+        assertTrue(redemptionEpoch.initiated);
+        assertFalse(redemptionEpoch.populated);
+        assertFalse(redemptionEpoch.finalized);
+        assertEq(redemptionEpoch.firstBlock, 1);
+        assertEq(redemptionEpoch.lastBlock, 1000);
+        assertEq(redemptionEpoch.totalFxtlPointsRedeemed, 0);
+        assertEq(redemptionEpoch.totalFraxDistributed, 0);
+        assertEq(redemptionEpoch.totalFloxStakeUnits, 0);
 
-        RedeemalEpochUserData memory epochUserData;
+        RedemptionEpochUserData memory epochUserData;
         UserData memory userData;
 
-        (epochUserData.fxtlPointsRedeemed, epochUserData.fraxReceived, epochUserData.floxStakeUnits) = floxConverter.redeemalEpochUserData(1, alice);
+        (epochUserData.fxtlPointsRedeemed, epochUserData.fraxReceived, epochUserData.floxStakeUnits) = floxConverter.redemptionEpochUserData(1, alice);
 
         (userData.totalFxtlPointsRedeemed, userData.totalFraxReceived) = floxConverter.userStats(alice);
 
@@ -446,7 +500,7 @@ contract Unit_Test_FloxConverter is BaseTestVeFXS, FloxConverterStructs, OwnedUp
         assertEq(userData.totalFxtlPointsRedeemed, 0);
         assertEq(userData.totalFraxReceived, 0);
 
-        (epochUserData.fxtlPointsRedeemed, epochUserData.fraxReceived, epochUserData.floxStakeUnits) = floxConverter.redeemalEpochUserData(1, bob);
+        (epochUserData.fxtlPointsRedeemed, epochUserData.fraxReceived, epochUserData.floxStakeUnits) = floxConverter.redemptionEpochUserData(1, bob);
 
         (userData.totalFxtlPointsRedeemed, userData.totalFraxReceived) = floxConverter.userStats(bob);
 
@@ -467,7 +521,7 @@ contract Unit_Test_FloxConverter is BaseTestVeFXS, FloxConverterStructs, OwnedUp
         hoax(frank);
         floxConverter.bulkUpdateUserData(users, fxtlPoints, floxStakeUnits);
 
-        (epochUserData.fxtlPointsRedeemed, epochUserData.fraxReceived, epochUserData.floxStakeUnits) = floxConverter.redeemalEpochUserData(1, alice);
+        (epochUserData.fxtlPointsRedeemed, epochUserData.fraxReceived, epochUserData.floxStakeUnits) = floxConverter.redemptionEpochUserData(1, alice);
 
         (userData.totalFxtlPointsRedeemed, userData.totalFraxReceived) = floxConverter.userStats(alice);
 
@@ -477,7 +531,7 @@ contract Unit_Test_FloxConverter is BaseTestVeFXS, FloxConverterStructs, OwnedUp
         assertEq(userData.totalFxtlPointsRedeemed, 2e18);
         assertEq(userData.totalFraxReceived, 0);
 
-        (epochUserData.fxtlPointsRedeemed, epochUserData.fraxReceived, epochUserData.floxStakeUnits) = floxConverter.redeemalEpochUserData(1, bob);
+        (epochUserData.fxtlPointsRedeemed, epochUserData.fraxReceived, epochUserData.floxStakeUnits) = floxConverter.redemptionEpochUserData(1, bob);
 
         (userData.totalFxtlPointsRedeemed, userData.totalFraxReceived) = floxConverter.userStats(bob);
 
@@ -487,11 +541,11 @@ contract Unit_Test_FloxConverter is BaseTestVeFXS, FloxConverterStructs, OwnedUp
         assertEq(userData.totalFxtlPointsRedeemed, 1e18);
         assertEq(userData.totalFraxReceived, 0);
 
-        (,,,,, redeemalEpoch.totalFxtlPointsRedeemed, redeemalEpoch.totalFraxDistributed, redeemalEpoch.totalFloxStakeUnits) = floxConverter.redeemalEpochs(1);
+        (,,,,, redemptionEpoch.totalFxtlPointsRedeemed, redemptionEpoch.totalFraxDistributed, redemptionEpoch.totalFloxStakeUnits) = floxConverter.redemptionEpochs(1);
 
-        assertEq(redeemalEpoch.totalFxtlPointsRedeemed, 3e18);
-        assertEq(redeemalEpoch.totalFraxDistributed, 0);
-        assertEq(redeemalEpoch.totalFloxStakeUnits, 142);
+        assertEq(redemptionEpoch.totalFxtlPointsRedeemed, 3e18);
+        assertEq(redemptionEpoch.totalFraxDistributed, 0);
+        assertEq(redemptionEpoch.totalFloxStakeUnits, 142);
 
         fxtlPoints[0] = 3e18;
         fxtlPoints[1] = 4e18;
@@ -509,7 +563,7 @@ contract Unit_Test_FloxConverter is BaseTestVeFXS, FloxConverterStructs, OwnedUp
         hoax(frank);
         floxConverter.bulkUpdateUserData(users, fxtlPoints, floxStakeUnits);
 
-        (epochUserData.fxtlPointsRedeemed, epochUserData.fraxReceived, epochUserData.floxStakeUnits) = floxConverter.redeemalEpochUserData(1, alice);
+        (epochUserData.fxtlPointsRedeemed, epochUserData.fraxReceived, epochUserData.floxStakeUnits) = floxConverter.redemptionEpochUserData(1, alice);
 
         (userData.totalFxtlPointsRedeemed, userData.totalFraxReceived) = floxConverter.userStats(alice);
 
@@ -519,7 +573,7 @@ contract Unit_Test_FloxConverter is BaseTestVeFXS, FloxConverterStructs, OwnedUp
         assertEq(userData.totalFxtlPointsRedeemed, 3e18);
         assertEq(userData.totalFraxReceived, 0);
 
-        (epochUserData.fxtlPointsRedeemed, epochUserData.fraxReceived, epochUserData.floxStakeUnits) = floxConverter.redeemalEpochUserData(1, bob);
+        (epochUserData.fxtlPointsRedeemed, epochUserData.fraxReceived, epochUserData.floxStakeUnits) = floxConverter.redemptionEpochUserData(1, bob);
 
         (userData.totalFxtlPointsRedeemed, userData.totalFraxReceived) = floxConverter.userStats(bob);
 
@@ -529,11 +583,11 @@ contract Unit_Test_FloxConverter is BaseTestVeFXS, FloxConverterStructs, OwnedUp
         assertEq(userData.totalFxtlPointsRedeemed, 4e18);
         assertEq(userData.totalFraxReceived, 0);
 
-        (,,,,, redeemalEpoch.totalFxtlPointsRedeemed, redeemalEpoch.totalFraxDistributed, redeemalEpoch.totalFloxStakeUnits) = floxConverter.redeemalEpochs(1);
+        (,,,,, redemptionEpoch.totalFxtlPointsRedeemed, redemptionEpoch.totalFraxDistributed, redemptionEpoch.totalFloxStakeUnits) = floxConverter.redemptionEpochs(1);
 
-        assertEq(redeemalEpoch.totalFxtlPointsRedeemed, 7e18);
-        assertEq(redeemalEpoch.totalFraxDistributed, 0);
-        assertEq(redeemalEpoch.totalFloxStakeUnits, 250);
+        assertEq(redemptionEpoch.totalFxtlPointsRedeemed, 7e18);
+        assertEq(redemptionEpoch.totalFraxDistributed, 0);
+        assertEq(redemptionEpoch.totalFloxStakeUnits, 250);
 
         vm.expectRevert(InvalidArrayLength.selector);
         hoax(frank);
@@ -554,7 +608,7 @@ contract Unit_Test_FloxConverter is BaseTestVeFXS, FloxConverterStructs, OwnedUp
         floxConverter.bulkUpdateUserData(users, fxtlPoints, floxStakeUnits);
 
         hoax(frank);
-        floxConverter.markRedeemalEpochAsPopulated();
+        floxConverter.markRedemptionEpochAsPopulated();
 
         vm.expectRevert(EpochAlreadyPopulated.selector);
         hoax(frank);
@@ -567,26 +621,26 @@ contract Unit_Test_FloxConverter is BaseTestVeFXS, FloxConverterStructs, OwnedUp
         floxConverter.bulkUpdateUserData(users, fxtlPoints, floxStakeUnits);
     }
 
-    function test_markRedeemalEpochAsPopulated() public {
+    function test_markRedemptionEpochAsPopulated() public {
         floxCapSetup();
 
-        RedeemalEpoch memory redeemalEpoch;
+        RedemptionEpoch memory redemptionEpoch;
 
-        (redeemalEpoch.initiated, redeemalEpoch.populated, redeemalEpoch.finalized,,, redeemalEpoch.totalFxtlPointsRedeemed, redeemalEpoch.totalFraxDistributed, redeemalEpoch.totalFloxStakeUnits) = floxConverter.redeemalEpochs(1);
+        (redemptionEpoch.initiated, redemptionEpoch.populated, redemptionEpoch.finalized,,, redemptionEpoch.totalFxtlPointsRedeemed, redemptionEpoch.totalFraxDistributed, redemptionEpoch.totalFloxStakeUnits) = floxConverter.redemptionEpochs(1);
 
-        assertFalse(redeemalEpoch.initiated);
-        assertFalse(redeemalEpoch.populated);
-        assertFalse(redeemalEpoch.finalized);
-        assertEq(redeemalEpoch.totalFxtlPointsRedeemed, 0);
-        assertEq(redeemalEpoch.totalFraxDistributed, 0);
-        assertEq(redeemalEpoch.totalFloxStakeUnits, 0);
+        assertFalse(redemptionEpoch.initiated);
+        assertFalse(redemptionEpoch.populated);
+        assertFalse(redemptionEpoch.finalized);
+        assertEq(redemptionEpoch.totalFxtlPointsRedeemed, 0);
+        assertEq(redemptionEpoch.totalFraxDistributed, 0);
+        assertEq(redemptionEpoch.totalFloxStakeUnits, 0);
 
         vm.expectRevert(EpochNotInitiated.selector);
         hoax(frank);
-        floxConverter.markRedeemalEpochAsPopulated();
+        floxConverter.markRedemptionEpochAsPopulated();
 
         hoax(frank);
-        floxConverter.initiateRedeemalEpoch(1000);
+        floxConverter.initiateRedemptionEpoch(1000);
 
         address[] memory users = new address[](2);
         users[0] = alice;
@@ -601,56 +655,56 @@ contract Unit_Test_FloxConverter is BaseTestVeFXS, FloxConverterStructs, OwnedUp
         hoax(frank);
         floxConverter.bulkUpdateUserData(users, fxtlPoints, floxStakeUnits);
 
-        (redeemalEpoch.initiated, redeemalEpoch.populated, redeemalEpoch.finalized,,, redeemalEpoch.totalFxtlPointsRedeemed, redeemalEpoch.totalFraxDistributed, redeemalEpoch.totalFloxStakeUnits) = floxConverter.redeemalEpochs(1);
+        (redemptionEpoch.initiated, redemptionEpoch.populated, redemptionEpoch.finalized,,, redemptionEpoch.totalFxtlPointsRedeemed, redemptionEpoch.totalFraxDistributed, redemptionEpoch.totalFloxStakeUnits) = floxConverter.redemptionEpochs(1);
 
-        assertTrue(redeemalEpoch.initiated);
-        assertFalse(redeemalEpoch.populated);
-        assertFalse(redeemalEpoch.finalized);
-        assertEq(redeemalEpoch.totalFxtlPointsRedeemed, 3e18);
-        assertEq(redeemalEpoch.totalFraxDistributed, 0);
-        assertEq(redeemalEpoch.totalFloxStakeUnits, 142);
+        assertTrue(redemptionEpoch.initiated);
+        assertFalse(redemptionEpoch.populated);
+        assertFalse(redemptionEpoch.finalized);
+        assertEq(redemptionEpoch.totalFxtlPointsRedeemed, 3e18);
+        assertEq(redemptionEpoch.totalFraxDistributed, 0);
+        assertEq(redemptionEpoch.totalFloxStakeUnits, 142);
 
         vm.expectEmit(false, false, false, true);
-        emit RedeemalEpochPopulated(1, 1, 1000, 142);
+        emit RedemptionEpochPopulated(1, 1, 1000, 142);
         hoax(frank);
-        floxConverter.markRedeemalEpochAsPopulated();
+        floxConverter.markRedemptionEpochAsPopulated();
 
-        (redeemalEpoch.initiated, redeemalEpoch.populated, redeemalEpoch.finalized,,, redeemalEpoch.totalFxtlPointsRedeemed, redeemalEpoch.totalFraxDistributed, redeemalEpoch.totalFloxStakeUnits) = floxConverter.redeemalEpochs(1);
+        (redemptionEpoch.initiated, redemptionEpoch.populated, redemptionEpoch.finalized,,, redemptionEpoch.totalFxtlPointsRedeemed, redemptionEpoch.totalFraxDistributed, redemptionEpoch.totalFloxStakeUnits) = floxConverter.redemptionEpochs(1);
 
-        assertTrue(redeemalEpoch.initiated);
-        assertTrue(redeemalEpoch.populated);
-        assertFalse(redeemalEpoch.finalized);
-        assertEq(redeemalEpoch.totalFxtlPointsRedeemed, 3e18);
-        assertEq(redeemalEpoch.totalFraxDistributed, 0);
-        assertEq(redeemalEpoch.totalFloxStakeUnits, 142);
+        assertTrue(redemptionEpoch.initiated);
+        assertTrue(redemptionEpoch.populated);
+        assertFalse(redemptionEpoch.finalized);
+        assertEq(redemptionEpoch.totalFxtlPointsRedeemed, 3e18);
+        assertEq(redemptionEpoch.totalFraxDistributed, 0);
+        assertEq(redemptionEpoch.totalFloxStakeUnits, 142);
 
         vm.expectRevert(EpochAlreadyPopulated.selector);
         hoax(frank);
-        floxConverter.markRedeemalEpochAsPopulated();
+        floxConverter.markRedemptionEpochAsPopulated();
 
         vm.expectRevert(NotFloxContributor.selector);
         hoax(bob);
-        floxConverter.markRedeemalEpochAsPopulated();
+        floxConverter.markRedemptionEpochAsPopulated();
 
         hoax(frank);
         floxConverter.stopOperation();
         vm.expectRevert(ContractPaused.selector);
         hoax(frank);
-        floxConverter.markRedeemalEpochAsPopulated();
+        floxConverter.markRedemptionEpochAsPopulated();
     }
 
     function test_distributeFrax() public {
         floxCapSetup();
 
-        RedeemalEpoch memory redeemalEpoch;
+        RedemptionEpoch memory redemptionEpoch;
 
-        (redeemalEpoch.initiated, redeemalEpoch.populated, redeemalEpoch.finalized,,,, redeemalEpoch.totalFraxDistributed, redeemalEpoch.totalFloxStakeUnits) = floxConverter.redeemalEpochs(1);
+        (redemptionEpoch.initiated, redemptionEpoch.populated, redemptionEpoch.finalized,,,, redemptionEpoch.totalFraxDistributed, redemptionEpoch.totalFloxStakeUnits) = floxConverter.redemptionEpochs(1);
 
-        assertFalse(redeemalEpoch.initiated);
-        assertFalse(redeemalEpoch.populated);
-        assertFalse(redeemalEpoch.finalized);
-        assertEq(redeemalEpoch.totalFraxDistributed, 0);
-        assertEq(redeemalEpoch.totalFloxStakeUnits, 0);
+        assertFalse(redemptionEpoch.initiated);
+        assertFalse(redemptionEpoch.populated);
+        assertFalse(redemptionEpoch.finalized);
+        assertEq(redemptionEpoch.totalFraxDistributed, 0);
+        assertEq(redemptionEpoch.totalFloxStakeUnits, 0);
 
         Rejector rejector = new Rejector();
         ReentrantUser reentrantUser = new ReentrantUser(address(floxConverter));
@@ -676,7 +730,7 @@ contract Unit_Test_FloxConverter is BaseTestVeFXS, FloxConverterStructs, OwnedUp
         floxConverter.distributeFrax(users);
 
         hoax(frank);
-        floxConverter.initiateRedeemalEpoch(1000);
+        floxConverter.initiateRedemptionEpoch(1000);
 
         hoax(frank);
         floxConverter.bulkUpdateUserData(users, fxtlPoints, floxStakeUnits);
@@ -688,24 +742,24 @@ contract Unit_Test_FloxConverter is BaseTestVeFXS, FloxConverterStructs, OwnedUp
         floxConverter.setYearlyFraxDistribution(100e18);
         deal(address(floxConverter), 100e18);
 
-        (redeemalEpoch.initiated, redeemalEpoch.populated, redeemalEpoch.finalized,,,, redeemalEpoch.totalFraxDistributed, redeemalEpoch.totalFloxStakeUnits) = floxConverter.redeemalEpochs(1);
+        (redemptionEpoch.initiated, redemptionEpoch.populated, redemptionEpoch.finalized,,,, redemptionEpoch.totalFraxDistributed, redemptionEpoch.totalFloxStakeUnits) = floxConverter.redemptionEpochs(1);
 
-        assertTrue(redeemalEpoch.initiated);
-        assertFalse(redeemalEpoch.populated);
-        assertFalse(redeemalEpoch.finalized);
-        assertEq(redeemalEpoch.totalFraxDistributed, 0);
-        assertEq(redeemalEpoch.totalFloxStakeUnits, 250);
+        assertTrue(redemptionEpoch.initiated);
+        assertFalse(redemptionEpoch.populated);
+        assertFalse(redemptionEpoch.finalized);
+        assertEq(redemptionEpoch.totalFraxDistributed, 0);
+        assertEq(redemptionEpoch.totalFloxStakeUnits, 250);
 
         hoax(frank);
-        floxConverter.markRedeemalEpochAsPopulated();
+        floxConverter.markRedemptionEpochAsPopulated();
 
-        (redeemalEpoch.initiated, redeemalEpoch.populated, redeemalEpoch.finalized,,,, redeemalEpoch.totalFraxDistributed, redeemalEpoch.totalFloxStakeUnits) = floxConverter.redeemalEpochs(1);
+        (redemptionEpoch.initiated, redemptionEpoch.populated, redemptionEpoch.finalized,,,, redemptionEpoch.totalFraxDistributed, redemptionEpoch.totalFloxStakeUnits) = floxConverter.redemptionEpochs(1);
 
-        assertTrue(redeemalEpoch.initiated);
-        assertTrue(redeemalEpoch.populated);
-        assertFalse(redeemalEpoch.finalized);
-        assertEq(redeemalEpoch.totalFraxDistributed, 0);
-        assertEq(redeemalEpoch.totalFloxStakeUnits, 250);
+        assertTrue(redemptionEpoch.initiated);
+        assertTrue(redemptionEpoch.populated);
+        assertFalse(redemptionEpoch.finalized);
+        assertEq(redemptionEpoch.totalFraxDistributed, 0);
+        assertEq(redemptionEpoch.totalFloxStakeUnits, 250);
 
         address[] memory usersToDistribute = new address[](2);
         usersToDistribute[0] = alice;
@@ -729,23 +783,23 @@ contract Unit_Test_FloxConverter is BaseTestVeFXS, FloxConverterStructs, OwnedUp
         hoax(frank);
         floxConverter.distributeFrax(usersToDistribute);
 
-        (redeemalEpoch.initiated, redeemalEpoch.populated, redeemalEpoch.finalized,,,, redeemalEpoch.totalFraxDistributed, redeemalEpoch.totalFloxStakeUnits) = floxConverter.redeemalEpochs(1);
+        (redemptionEpoch.initiated, redemptionEpoch.populated, redemptionEpoch.finalized,,,, redemptionEpoch.totalFraxDistributed, redemptionEpoch.totalFloxStakeUnits) = floxConverter.redemptionEpochs(1);
 
-        assertTrue(redeemalEpoch.initiated);
-        assertTrue(redeemalEpoch.populated);
-        assertFalse(redeemalEpoch.finalized);
-        assertApproxEqAbs(redeemalEpoch.totalFraxDistributed, uint256(100e18 * 150 * 7 days) / ((365 days * 250)), 2);
-        assertEq(redeemalEpoch.totalFloxStakeUnits, 250);
+        assertTrue(redemptionEpoch.initiated);
+        assertTrue(redemptionEpoch.populated);
+        assertFalse(redemptionEpoch.finalized);
+        assertApproxEqAbs(redemptionEpoch.totalFraxDistributed, uint256(100e18 * 150 * 7 days) / ((365 days * 250)), 2);
+        assertEq(redemptionEpoch.totalFloxStakeUnits, 250);
 
         assertApproxEqAbs(floxConverter.remainingFraxAvailable(), 100e18 - (uint256(100e18 * 150 * 7 days) / ((365 days * 250))), 2);
         assertApproxEqAbs(address(floxConverter).balance, 100e18 - (uint256(100e18 * 150 * 7 days) / ((365 days * 250))), 2);
 
         assertEq(floxConverter.totalFxtlPointsRedeemed(), 5e18);
 
-        RedeemalEpochUserData memory epochUserData;
+        RedemptionEpochUserData memory epochUserData;
         UserData memory userData;
 
-        (epochUserData.fxtlPointsRedeemed, epochUserData.fraxReceived, epochUserData.floxStakeUnits) = floxConverter.redeemalEpochUserData(1, alice);
+        (epochUserData.fxtlPointsRedeemed, epochUserData.fraxReceived, epochUserData.floxStakeUnits) = floxConverter.redemptionEpochUserData(1, alice);
 
         (userData.totalFxtlPointsRedeemed, userData.totalFraxReceived) = floxConverter.userStats(alice);
 
@@ -755,7 +809,7 @@ contract Unit_Test_FloxConverter is BaseTestVeFXS, FloxConverterStructs, OwnedUp
         assertEq(userData.totalFxtlPointsRedeemed, 2e18);
         assertApproxEqAbs(userData.totalFraxReceived, uint256(100e18 * 50 * 7 days) / ((365 days * 250)), 2);
 
-        (epochUserData.fxtlPointsRedeemed, epochUserData.fraxReceived, epochUserData.floxStakeUnits) = floxConverter.redeemalEpochUserData(1, bob);
+        (epochUserData.fxtlPointsRedeemed, epochUserData.fraxReceived, epochUserData.floxStakeUnits) = floxConverter.redemptionEpochUserData(1, bob);
 
         (userData.totalFxtlPointsRedeemed, userData.totalFraxReceived) = floxConverter.userStats(bob);
 
@@ -770,16 +824,16 @@ contract Unit_Test_FloxConverter is BaseTestVeFXS, FloxConverterStructs, OwnedUp
         floxConverter.distributeFrax(usersToDistribute);
 
         hoax(frank);
-        floxConverter.finalizeRedeemalEpoch();
+        floxConverter.finalizeRedemptionEpoch();
 
         hoax(frank);
-        floxConverter.initiateRedeemalEpoch(2000);
+        floxConverter.initiateRedemptionEpoch(2000);
 
         hoax(frank);
         floxConverter.bulkUpdateUserData(users, fxtlPoints, floxStakeUnits);
 
         hoax(frank);
-        floxConverter.markRedeemalEpochAsPopulated();
+        floxConverter.markRedemptionEpochAsPopulated();
 
         vm.expectEmit(true, false, false, true);
         emit DistributionAllocated(alice, uint256(100e18 * 50 * 7 days) / ((365 days * 250)));
@@ -793,7 +847,7 @@ contract Unit_Test_FloxConverter is BaseTestVeFXS, FloxConverterStructs, OwnedUp
 
         assertEq(floxConverter.totalFxtlPointsRedeemed(), 10e18);
 
-        (epochUserData.fxtlPointsRedeemed, epochUserData.fraxReceived, epochUserData.floxStakeUnits) = floxConverter.redeemalEpochUserData(1, alice);
+        (epochUserData.fxtlPointsRedeemed, epochUserData.fraxReceived, epochUserData.floxStakeUnits) = floxConverter.redemptionEpochUserData(1, alice);
 
         (userData.totalFxtlPointsRedeemed, userData.totalFraxReceived) = floxConverter.userStats(alice);
 
@@ -803,7 +857,7 @@ contract Unit_Test_FloxConverter is BaseTestVeFXS, FloxConverterStructs, OwnedUp
         assertEq(userData.totalFxtlPointsRedeemed, 4e18);
         assertApproxEqAbs(userData.totalFraxReceived, uint256(100e18 * 50 * 7 days * 2) / ((365 days * 250)), 2);
 
-        (epochUserData.fxtlPointsRedeemed, epochUserData.fraxReceived, epochUserData.floxStakeUnits) = floxConverter.redeemalEpochUserData(1, bob);
+        (epochUserData.fxtlPointsRedeemed, epochUserData.fraxReceived, epochUserData.floxStakeUnits) = floxConverter.redemptionEpochUserData(1, bob);
 
         (userData.totalFxtlPointsRedeemed, userData.totalFraxReceived) = floxConverter.userStats(bob);
 
@@ -822,49 +876,56 @@ contract Unit_Test_FloxConverter is BaseTestVeFXS, FloxConverterStructs, OwnedUp
         vm.expectRevert(ContractPaused.selector);
         hoax(frank);
         floxConverter.distributeFrax(usersToDistribute);
+
+        vm.mockCall(address(floxConverter.FXTL_POINTS()), abi.encodeWithSignature("balanceOf(address)", alice), abi.encode(100e18));
+
+        uint256 availableFxtlPoints = floxConverter.totalEligibleFxtlPointsByUser(alice);
+        uint256 redeemedPoints;
+        (redeemedPoints,) = floxConverter.userStats(alice);
+        assertEq(availableFxtlPoints, floxConverter.FXTL_POINTS().balanceOf(alice) - redeemedPoints);
     }
 
-    function test_finalizeRedeemalEpoch() public {
+    function test_finalizeRedemptionEpoch() public {
         floxCapSetup();
 
         assertEq(floxConverter.latestAllocatedDistributionEpoch(), 0);
 
-        RedeemalEpoch memory redeemalEpoch;
+        RedemptionEpoch memory redemptionEpoch;
 
-        (redeemalEpoch.initiated, redeemalEpoch.populated, redeemalEpoch.finalized,,,,,) = floxConverter.redeemalEpochs(1);
+        (redemptionEpoch.initiated, redemptionEpoch.populated, redemptionEpoch.finalized,,,,,) = floxConverter.redemptionEpochs(1);
 
-        assertFalse(redeemalEpoch.initiated);
-        assertFalse(redeemalEpoch.populated);
-        assertFalse(redeemalEpoch.finalized);
+        assertFalse(redemptionEpoch.initiated);
+        assertFalse(redemptionEpoch.populated);
+        assertFalse(redemptionEpoch.finalized);
 
         vm.expectRevert(NotFloxContributor.selector);
         hoax(bob);
-        floxConverter.finalizeRedeemalEpoch();
+        floxConverter.finalizeRedemptionEpoch();
 
         vm.expectRevert(EpochNotInitiated.selector);
         hoax(frank);
-        floxConverter.finalizeRedeemalEpoch();
+        floxConverter.finalizeRedemptionEpoch();
 
         hoax(frank);
-        floxConverter.initiateRedeemalEpoch(1000);
+        floxConverter.initiateRedemptionEpoch(1000);
 
         vm.expectRevert(EpochNotPopulated.selector);
         hoax(frank);
-        floxConverter.finalizeRedeemalEpoch();
+        floxConverter.finalizeRedemptionEpoch();
 
         hoax(frank);
-        floxConverter.markRedeemalEpochAsPopulated();
+        floxConverter.markRedemptionEpochAsPopulated();
 
         vm.expectEmit(false, false, false, true);
-        emit RedeemalEpochFinalized(1);
+        emit RedemptionEpochFinalized(1);
         hoax(frank);
-        floxConverter.finalizeRedeemalEpoch();
+        floxConverter.finalizeRedemptionEpoch();
 
-        (redeemalEpoch.initiated, redeemalEpoch.populated, redeemalEpoch.finalized,,,,,) = floxConverter.redeemalEpochs(1);
+        (redemptionEpoch.initiated, redemptionEpoch.populated, redemptionEpoch.finalized,,,,,) = floxConverter.redemptionEpochs(1);
 
-        assertTrue(redeemalEpoch.initiated);
-        assertTrue(redeemalEpoch.populated);
-        assertTrue(redeemalEpoch.finalized);
+        assertTrue(redemptionEpoch.initiated);
+        assertTrue(redemptionEpoch.populated);
+        assertTrue(redemptionEpoch.finalized);
         assertEq(floxConverter.latestAllocatedDistributionEpoch(), 1);
 
         hoax(frank);
@@ -872,7 +933,7 @@ contract Unit_Test_FloxConverter is BaseTestVeFXS, FloxConverterStructs, OwnedUp
 
         vm.expectRevert(ContractPaused.selector);
         hoax(frank);
-        floxConverter.finalizeRedeemalEpoch();
+        floxConverter.finalizeRedemptionEpoch();
     }
 
     function test_setYearlyFraxDistribution() public {
@@ -890,6 +951,32 @@ contract Unit_Test_FloxConverter is BaseTestVeFXS, FloxConverterStructs, OwnedUp
         floxConverter.setYearlyFraxDistribution(100e18);
 
         assertEq(floxConverter.yearlyFraxDistribution(), 100e18);
+    }
+
+    function test_recoverFrax() public {
+        floxCapSetup();
+        deal(address(floxConverter), 100e18);
+
+        uint256 thisBalance = address(this).balance;
+        uint256 contractBalance = address(floxConverter).balance;
+
+        vm.expectEmit(false, false, false, true);
+        emit RecoveredFrax(contractBalance / 2);
+        floxConverter.recoverFrax(contractBalance / 2);
+
+        assertEq(address(this).balance, thisBalance + (contractBalance / 2));
+        assertEq(address(floxConverter).balance, contractBalance / 2);
+
+        vm.expectRevert(OnlyOwner.selector);
+        hoax(frank);
+        floxConverter.recoverFrax(contractBalance / 2);
+
+        vm.expectRevert(TransferFailed.selector);
+        floxConverter.recoverFrax(contractBalance);
+    }
+
+    receive() external payable {
+        // Allow the tested contract to send FRAX to this test contract
     }
 }
 

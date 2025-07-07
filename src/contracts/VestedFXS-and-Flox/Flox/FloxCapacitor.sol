@@ -13,9 +13,9 @@ pragma solidity >=0.8.0;
 // ====================================================================
 
 import { OwnedUpgradeable } from "./OwnedUpgradeable.sol";
+import { FloxConverter } from "./FloxConverter.sol";
 import { FraxStaker } from "../FraxStaker/FraxStaker.sol";
 import { VeFXSAggregator } from "../VestedFXS/VeFXSAggregator.sol";
-import { IERC20 } from "@openzeppelin-4/contracts/token/ERC20/IERC20.sol";
 import { IFloxCapacitorErrors } from "./interfaces/IFloxCapacitorErrors.sol";
 import { IFloxCapacitorEvents } from "./interfaces/IFloxCapacitorEvents.sol";
 
@@ -23,14 +23,34 @@ import { IFloxCapacitorEvents } from "./interfaces/IFloxCapacitorEvents.sol";
  * @title FloxCapacitor
  * @author Frax Finance
  * @notice A smart contract that allows users to stake FRAX and receive FloxCAP tokens.
- * @dev The FloxCAP token is not transferable.
- * @dev The balance of the FloxCAP token represents the amount of FRAX staked by the user.
+ * @dev Used to aggregate user balances to be used to apply conversion boost in FloxConverter. It should be able to
+ *  combine FraxStaker balance with scaled and limited veFRAX aggregated balance.
+ * @dev The FloxCAP balance is not an ERC-20 token balance, but just a representation of accumulated balance used for
+ *  FXTL point to FRAX conversions.
+ * @dev We should be able to set delegations for the users (so that the aggregated balances can be compounded to a
+ *  single address). We will be able to verify that there are not too many delegations that would cause OOG errors, so
+ *  this is not an issue.
+ * @dev Scenario: In FraxStaker, Person A --(delegation)--> Person B. Move to FloxCapacitor. Then
+ *  Person B --(delegation)--> Person C. Person C will now have A + B + C, but only for the purposes of FXTL point
+ *  conversion.
+ * @dev It should be able to communicate with FloxConverter to determine how much FRAX the user needs in order to obtain
+ *  the maximum boost (referred to as flox stake units). This in turn limits the percentage of balance the veFRAX
+ *  sourced balance can represent (so if it's set at 25%, then up to 25% of the FloxCap balance can be sourced from the
+ *  scaled veFRAX balance (the veFRAX balance is retrieved by a settable divisor)).
+ * @dev The FloxCAP balance represents the amount of FRAX staked by the user.
  */
 contract FloxCapacitor is OwnedUpgradeable, IFloxCapacitorErrors, IFloxCapacitorEvents {
-    /// Instance of the Frax Staker.
+    /// @notice Instance of the Frax Staker.
     FraxStaker public fraxStaker;
-    /// Instance of the VeFRAX Aggregator.
+
+    /// @notice Instance of the VeFRAX Aggregator.
     VeFXSAggregator public veFRAX;
+
+    /// @notice Instance of the Flox Converter.
+    FloxConverter public floxConverter;
+
+    /// @notice The maximum amount of basis points used in calculations to increase precision (equals 100%).
+    uint256 public constant MAX_BASIS_POINTS = 1e5;
 
     /**
      * @notice Used to track the Flox contributors.
@@ -58,15 +78,19 @@ contract FloxCapacitor is OwnedUpgradeable, IFloxCapacitorErrors, IFloxCapacitor
      */
     mapping(address delegatee => uint256 count) public incomingDelegationsCount;
 
-    /// Version of the FloxCAP smart contract.
+    /// @notice Version of the FloxCAP smart contract.
     string public version;
-    /// The divisor used to convert the veFRAX balance to FloxCAP balance.
+
+    /// @notice The amount of basis points used to limit the impact of veFRAX balance in cumulative balance.
+    uint256 public veFraxBoostLimitBasisPoints;
+
+    /// @notice The divisor used to convert the veFRAX balance to FloxCAP balance.
     uint8 public veFraxDivisor;
-    /// Variable to track if the contract is paused.
-    bool public isPaused;
-    /// Toggle to signal whether the veFRAX balances should be taken into account.
+
+    /// @notice Toggle to signal whether the veFRAX balances should be taken into account.
     bool public useVeFRAX;
-    /// Used to make sure the contract is initialized only once.
+
+    /// @notice Used to make sure the contract is initialized only once.
     bool private _initialized;
 
     /// @dev reserve extra storage for future upgrades
@@ -82,7 +106,7 @@ contract FloxCapacitor is OwnedUpgradeable, IFloxCapacitorErrors, IFloxCapacitor
      * @param _version Version of the FloxCAP smart contract
      */
     function initialize(
-        address _fraxStaker,
+        address payable _fraxStaker,
         address _owner,
         address _veFraxAggregator,
         uint8 _veFraxDivisor,
@@ -93,6 +117,7 @@ contract FloxCapacitor is OwnedUpgradeable, IFloxCapacitorErrors, IFloxCapacitor
         _initialized = true;
         fraxStaker = FraxStaker(_fraxStaker);
         veFRAX = VeFXSAggregator(_veFraxAggregator);
+        veFraxBoostLimitBasisPoints = 25_000; // 25% of the total boost can come from veFRAX
         veFraxDivisor = _veFraxDivisor;
         version = _version;
 
@@ -125,30 +150,6 @@ contract FloxCapacitor is OwnedUpgradeable, IFloxCapacitorErrors, IFloxCapacitor
         if (!isFloxContributor[_contributor]) revert NotFloxContributor();
         isFloxContributor[_contributor] = false;
         emit FloxContributorRemoved(_contributor);
-    }
-
-    /**
-     * @notice Stops the operation of the smart contract.
-     * @dev Can only be called by a Flox contributor.
-     * @dev Can only be called if the contract is operational.
-     */
-    function stopOperation() external {
-        _onlyFloxContributor();
-        if (isPaused) revert ContractPaused();
-        isPaused = true;
-        emit OperationPaused(isPaused, block.timestamp);
-    }
-
-    /**
-     * @notice Enables the operation of the smart contract.
-     * @dev Can only be called by the owner.
-     * @dev Can only be called if the contract is paused.
-     */
-    function restartOperation() external {
-        _onlyOwner();
-        if (!isPaused) revert ContractOperational();
-        isPaused = false;
-        emit OperationPaused(isPaused, block.timestamp);
     }
 
     /**
@@ -196,33 +197,50 @@ contract FloxCapacitor is OwnedUpgradeable, IFloxCapacitorErrors, IFloxCapacitor
     }
 
     /**
-     * @notice Used to retrieve the balance of the FloxCAP boost token.
+     * @notice Used to set the Flox Converter address.
+     * @dev Can only be called by the owner.
+     * @dev The operation will be reverted if the Flox Converter is already initialized.
+     * @param _floxConverter The address of the Flox Converter
+     */
+    function setFloxConverter(address payable _floxConverter) external {
+        _onlyOwner();
+        if (address(floxConverter) != address(0)) revert AlreadyInitialized();
+
+        floxConverter = FloxConverter(_floxConverter);
+    }
+
+    /**
+     * @notice Used to retrieve the FloxCAP balance of user.
      * @dev If enabled, the scaled veFRAX balance is added to the FloxCAP balance.
      * @dev The veFRAX balance is scaled by the veFraxDivisor.
      * @dev This sums all of the delegated balaces of the users that delegated to the account.
      * @param account The address to check the balance of
-     * @return The balance of the FloxCAP boost token
+     * @return _floxCapBalance The FloxCAP balance of the `account`
      */
-    function balanceOf(address account) public view returns (uint256) {
-        uint256 floxCapBalance = _balanceOf(account);
+    function balanceOf(address account) public view returns (uint256 _floxCapBalance) {
+        // Get account's own balance first
+        _floxCapBalance = _balanceOf(account);
 
+        // Reset own balance to 0 if it is delegated to someone else
         if (delegations[account] != address(0)) {
-            floxCapBalance = 0;
+            _floxCapBalance = 0;
         }
 
+        // Loop through incoming delegations
         if (incomingDelegationsCount[account] > 0) {
             for (uint256 i; i < incomingDelegationsCount[account]; ) {
+                // Get the delegator and its balance
                 address delegator = incomingDelegations[account][i];
                 uint256 delegatorBalance = _balanceOf(delegator);
-                floxCapBalance += delegatorBalance;
+
+                // Accumulate the balance
+                _floxCapBalance += delegatorBalance;
 
                 unchecked {
                     ++i;
                 }
             }
         }
-
-        return floxCapBalance;
     }
 
     /**
@@ -235,15 +253,7 @@ contract FloxCapacitor is OwnedUpgradeable, IFloxCapacitorErrors, IFloxCapacitor
      */
     function delegate(address _delegator, address _delegatee) external {
         _onlyFloxContributor();
-
-        if (_delegator == _delegatee) revert CannotDelegateToSelf();
-        if (delegations[_delegator] != address(0)) revert AlreadyDelegated();
-
-        delegations[_delegator] = _delegatee;
-        incomingDelegations[_delegatee][incomingDelegationsCount[_delegatee]] = _delegator;
-        incomingDelegationsCount[_delegatee] = incomingDelegationsCount[_delegatee] + 1;
-
-        emit DelegationAdded(_delegator, _delegatee);
+        _delegate(_delegator, _delegatee);
     }
 
     /**
@@ -262,17 +272,7 @@ contract FloxCapacitor is OwnedUpgradeable, IFloxCapacitorErrors, IFloxCapacitor
         if (_delegators.length != _delegatees.length) revert ArrayLengthMismatch();
 
         for (uint256 i; i < _delegators.length; ) {
-            address delegator = _delegators[i];
-            address delegatee = _delegatees[i];
-
-            if (delegator == delegatee) revert CannotDelegateToSelf();
-            if (delegations[delegator] != address(0)) revert AlreadyDelegated();
-
-            delegations[delegator] = delegatee;
-            incomingDelegations[delegatee][incomingDelegationsCount[delegatee]] = delegator;
-            incomingDelegationsCount[delegatee] = incomingDelegationsCount[delegatee] + 1;
-
-            emit DelegationAdded(delegator, delegatee);
+            _delegate(_delegators[i], _delegatees[i]);
 
             unchecked {
                 ++i;
@@ -288,19 +288,9 @@ contract FloxCapacitor is OwnedUpgradeable, IFloxCapacitorErrors, IFloxCapacitor
      */
     function revokeDelegation(address _delegator) external {
         _onlyFloxContributor();
+        if (_delegator == address(0)) revert ZeroAddress();
 
-        address delegatee = delegations[_delegator];
-        if (delegatee == address(0)) revert NoActiveDelegations();
-
-        uint256 index = _findDelegatorIndex(_delegator);
-
-        incomingDelegationsCount[delegatee]--;
-        incomingDelegations[delegatee][index] = incomingDelegations[delegatee][incomingDelegationsCount[delegatee]];
-        incomingDelegations[delegatee][incomingDelegationsCount[delegatee]] = address(0);
-
-        delegations[_delegator] = address(0);
-
-        emit DelegationRemoved(_delegator, delegatee);
+        _revokeDelegation(_delegator);
     }
 
     /**
@@ -314,19 +304,9 @@ contract FloxCapacitor is OwnedUpgradeable, IFloxCapacitorErrors, IFloxCapacitor
 
         for (uint256 i; i < _delegators.length; ) {
             address delegator = _delegators[i];
-            address delegatee = delegations[delegator];
+            if (delegator == address(0)) revert ZeroAddress();
 
-            if (delegatee == address(0)) revert NoActiveDelegations();
-
-            uint256 index = _findDelegatorIndex(delegator);
-
-            incomingDelegationsCount[delegatee]--;
-            incomingDelegations[delegatee][index] = incomingDelegations[delegatee][incomingDelegationsCount[delegatee]];
-            incomingDelegations[delegatee][incomingDelegationsCount[delegatee]] = address(0);
-
-            delegations[delegator] = address(0);
-
-            emit DelegationRemoved(delegator, delegatee);
+            _revokeDelegation(delegator);
 
             unchecked {
                 ++i;
@@ -344,6 +324,7 @@ contract FloxCapacitor is OwnedUpgradeable, IFloxCapacitorErrors, IFloxCapacitor
         address delegatee = delegations[_delegator];
         uint256 allIncomingDelegations = incomingDelegationsCount[delegatee];
 
+        // Need to make sure there are not too many delegations here, or OOG may occur.
         for (uint256 i; i < allIncomingDelegations; ) {
             if (incomingDelegations[delegatee][i] == _delegator) {
                 return i;
@@ -360,19 +341,94 @@ contract FloxCapacitor is OwnedUpgradeable, IFloxCapacitorErrors, IFloxCapacitor
     /**
      * @notice Used to retrieve the balance of the FloxCAP boost token.
      * @dev If enabled, the scaled veFRAX balance is added to the FloxCAP balance.
-     * @dev The veFRAX balance is scaled by the veFraxDivisor.
      * @param account The address to check the balance of
      * @return The balance of the FloxCAP boost token
      */
     function _balanceOf(address account) internal view returns (uint256) {
-        uint256 sFraxBalance = fraxStaker.balanceOf(account);
+        uint256 fraxStakerBalance = fraxStaker.balanceOf(account);
+        uint256 veFraxBalance = 0;
 
         if (useVeFRAX) {
-            uint256 veFRAXBalance = veFRAX.balanceOf(account);
-            return (veFRAXBalance / veFraxDivisor) + sFraxBalance;
+            veFraxBalance = _getVeFraxScaledBalance(account);
         }
 
-        return sFraxBalance;
+        return fraxStakerBalance + veFraxBalance;
+    }
+
+    /**
+     * @notice Used to retrieve the scaled veFRAX balance of the account.
+     * @dev The veFRAX balance is scaled by the veFraxDivisor.
+     * @dev The veFRAX balance is limited by the percentage of maximum boost required balance based on the FXTL points.
+     * @dev This is a cummulative balance of Fraxtal veFRAX, Ethereum veFRAX, and Fraxtal lFPIS.
+     * @param account The address to check the balance of
+     * @return The scaled veFRAX balance of the account
+     */
+    function _getVeFraxScaledBalance(address account) internal view returns (uint256) {
+        uint256 veFraxBalance = veFRAX.balanceOf(account) / veFraxDivisor;
+        uint256 fxtlPoints = floxConverter.getCurrentUserRedemptionEpochFxtlPoints(account);
+
+        if (veFraxBalance == 0 || fxtlPoints == 0) {
+            return 0;
+        }
+
+        uint256 pointsPerFrax = floxConverter.fxtlPointsPerOneFrax();
+        uint256 maxBoostRequiredBalance = (fxtlPoints * 1e18) / pointsPerFrax; // We need to scale up FXTL points to the amount of FRAX decimals
+
+        uint256 veFraxLimit = (maxBoostRequiredBalance * veFraxBoostLimitBasisPoints) / MAX_BASIS_POINTS;
+
+        if (veFraxBalance >= veFraxLimit) {
+            return veFraxLimit;
+        } else {
+            return veFraxBalance;
+        }
+    }
+
+    /**
+     * @notice Used to delegate `_delegator`'s balance to the specified `delegatee`.
+     * @dev The operation will be reverted if either of the addresses is zero address.
+     * @dev The operation will be reverted if the delegator is delegating to themselves.
+     * @dev The operation will be reverted if the delegator already has an active delegation.
+     * @param _delegator The address of the user delegating their balance
+     * @param _delegatee The address of the user receiving the delegation
+     */
+    function _delegate(address _delegator, address _delegatee) internal {
+        if (_delegator == address(0) || _delegatee == address(0)) revert ZeroAddress();
+
+        if (_delegator == _delegatee) revert CannotDelegateToSelf();
+        if (delegations[_delegator] != address(0)) revert AlreadyDelegated();
+
+        delegations[_delegator] = _delegatee;
+        incomingDelegations[_delegatee][incomingDelegationsCount[_delegatee]] = _delegator;
+        incomingDelegationsCount[_delegatee] = incomingDelegationsCount[_delegatee] + 1;
+
+        emit DelegationAdded(_delegator, _delegatee);
+    }
+
+    /**
+     * @notice Used to revoke the delegation of the specified delegator.
+     * @dev The operation will be reverted if the delegator does not have an active delegation.
+     * @param _delegator The address of the user delegating their balance
+     */
+    function _revokeDelegation(address _delegator) internal {
+        address delegatee = delegations[_delegator];
+        if (delegatee == address(0)) revert NoActiveDelegations();
+
+        // Find the index of the _delegator
+        uint256 index = _findDelegatorIndex(_delegator);
+
+        // Decrement the delegations count for the delegatee
+        incomingDelegationsCount[delegatee]--;
+
+        // Change the index of the last delegator in the mapping (not necessarily the provided _delegator) to the index of the soon-to-be-deleted _delegator
+        incomingDelegations[delegatee][index] = incomingDelegations[delegatee][incomingDelegationsCount[delegatee]];
+
+        // Set the last index to 0
+        incomingDelegations[delegatee][incomingDelegationsCount[delegatee]] = address(0);
+
+        // Set the delegations to 0 for the _delegator
+        delegations[_delegator] = address(0);
+
+        emit DelegationRemoved(_delegator, delegatee);
     }
 
     /**

@@ -5,15 +5,19 @@ import { BaseTestVeFXS } from "../BaseTestVeFXS.t.sol";
 import { MintableBurnableTestERC20 } from "src/test/VestedFXS-and-Flox/helpers/MintableBurnableTestERC20.sol";
 import { FraxStaker, FraxStakerStructs } from "src/contracts/VestedFXS-and-Flox/FraxStaker/FraxStaker.sol";
 import { OwnedUpgradeable } from "src/contracts/VestedFXS-and-Flox/Flox/OwnedUpgradeable.sol";
+import { NonReentrant } from "src/contracts/VestedFXS-and-Flox/Flox/NonReentrant.sol";
 import { VeFXSAggregator } from "src/contracts/VestedFXS-and-Flox/VestedFXS/VeFXSAggregator.sol";
 import { console } from "frax-std/FraxTest.sol";
 import "forge-std/console2.sol";
+import "forge-std/Vm.sol";
 
 contract Unit_Test_FraxStaker is BaseTestVeFXS, FraxStakerStructs, OwnedUpgradeable {
     uint256 aliceBalance;
     uint256 bobBalance;
     uint256 frankBalance;
     uint256 claireBalance;
+
+    bool testingSlashing;
 
     function fraxStakerSetup() public {
         console.log("defaultSetup() called");
@@ -33,6 +37,9 @@ contract Unit_Test_FraxStaker is BaseTestVeFXS, FraxStakerStructs, OwnedUpgradea
 
         // Set frank as the Frax contributor
         fraxStaker.addFraxContributor(frank);
+
+        vm.expectRevert(AlreadyInitialized.selector);
+        fraxStaker.initialize(bob, "FraxStaker_v2.0.0");
     }
 
     function test_commitTransferOwnership() public {
@@ -296,9 +303,11 @@ contract Unit_Test_FraxStaker is BaseTestVeFXS, FraxStakerStructs, OwnedUpgradea
         assertEq(stakeEntry.unlockTime, 0);
         assertEq(stakeEntry.delegatee, alice);
         assertFalse(stakeEntry.initiatedWithdrawal);
+        assertEq(fraxStaker.balanceOf(bob), 0);
+        assertEq(fraxStaker.balanceOf(alice), 50e18);
 
         vm.expectEmit(true, true, false, true);
-        emit DelegationRevocationInitiated(bob, alice, 50e18, block.timestamp + 90 days);
+        emit StakeDelegationRevoked(bob, alice, 50e18);
         vm.expectEmit(true, false, false, true);
         emit StakeWithdrawalInitiated(bob, 50e18, block.timestamp + 90 days);
         vm.prank(bob);
@@ -308,12 +317,21 @@ contract Unit_Test_FraxStaker is BaseTestVeFXS, FraxStakerStructs, OwnedUpgradea
 
         assertEq(stakeEntry.amountStaked, 50e18);
         assertEq(stakeEntry.unlockTime, block.timestamp + 90 days);
-        assertEq(stakeEntry.delegatee, alice);
+        assertEq(stakeEntry.delegatee, address(0));
         assertTrue(stakeEntry.initiatedWithdrawal);
+        assertEq(fraxStaker.balanceOf(bob), 0);
+        assertEq(fraxStaker.balanceOf(alice), 0);
 
         vm.expectRevert(WithdrawalInitiated.selector);
         vm.prank(bob);
         fraxStaker.initiateWithdrawal();
+
+        vm.prank(claire);
+        fraxStaker.stakeFrax{ value: 10e18 }(bob);
+
+        assertEq(fraxStaker.balanceOf(bob), 10e18);
+        assertEq(fraxStaker.balanceOf(alice), 0);
+        assertEq(fraxStaker.balanceOf(claire), 0);
 
         vm.prank(frank);
         fraxStaker.stopOperation();
@@ -379,6 +397,19 @@ contract Unit_Test_FraxStaker is BaseTestVeFXS, FraxStakerStructs, OwnedUpgradea
         assertEq(fraxStaker.balanceOf(bob), 0);
         assertApproxEqAbs(bob.balance, bobBalance, 1e15);
         assertEq(address(fraxStaker).balance, 0);
+
+        vm.deal(address(fraxStaker), 10e18);
+        ReentrantWithdraw reentrantWithdraw = new ReentrantWithdraw();
+        vm.deal(address(reentrantWithdraw), 50e18);
+        vm.prank(address(reentrantWithdraw));
+        fraxStaker.stakeFrax{ value: 1e18 }();
+        vm.prank(address(reentrantWithdraw));
+        fraxStaker.initiateWithdrawal();
+        skip(90 days);
+
+        vm.expectRevert(TransferFailed.selector);
+        vm.prank(address(reentrantWithdraw));
+        fraxStaker.withdrawStake();
 
         vm.prank(frank);
         fraxStaker.stopOperation();
@@ -485,15 +516,15 @@ contract Unit_Test_FraxStaker is BaseTestVeFXS, FraxStakerStructs, OwnedUpgradea
         (stakeEntry.amountStaked, stakeEntry.amountDelegated,, stakeEntry.unlockTime, stakeEntry.delegatee, stakeEntry.initiatedWithdrawal) = fraxStaker.stakes(bob);
 
         assertEq(stakeEntry.amountStaked, 50e18);
-        assertEq(stakeEntry.amountDelegated, 50e18);
+        assertEq(stakeEntry.amountDelegated, 0);
         assertEq(stakeEntry.unlockTime, block.timestamp + 90 days);
-        assertEq(stakeEntry.delegatee, alice);
+        assertEq(stakeEntry.delegatee, address(0));
         assertTrue(stakeEntry.initiatedWithdrawal);
 
         (stakeEntry.amountStaked,, stakeEntry.amountDelegatedToStaker, stakeEntry.unlockTime, stakeEntry.delegatee, stakeEntry.initiatedWithdrawal) = fraxStaker.stakes(alice);
 
         assertEq(stakeEntry.amountStaked, 0);
-        assertEq(stakeEntry.amountDelegatedToStaker, 50e18);
+        assertEq(stakeEntry.amountDelegatedToStaker, 0);
         assertEq(stakeEntry.unlockTime, 0);
         assertEq(stakeEntry.delegatee, address(0));
         assertFalse(stakeEntry.initiatedWithdrawal);
@@ -686,6 +717,25 @@ contract Unit_Test_FraxStaker is BaseTestVeFXS, FraxStakerStructs, OwnedUpgradea
         assertApproxEqAbs(bob.balance, bobBalance - 50e18, 1e15);
         assertApproxEqAbs(alice.balance, aliceBalance - 70e18, 1e15);
         assertEq(fraxStaker.SLASHING_RECIPIENT().balance, 110e18);
+
+        DisabledReceive disabled = new DisabledReceive();
+        fraxStaker.proposeSlashingRecipientUpdate(address(disabled));
+        skip(7 days);
+        fraxStaker.acceptSlashingRecipientUpdate();
+
+        vm.expectRevert(TransferFailed.selector);
+        vm.prank(claire);
+        fraxStaker.slashStaker(bob, 10e18);
+
+        fraxStaker.proposeSlashingRecipientUpdate(address(this));
+        skip(7 days);
+        fraxStaker.acceptSlashingRecipientUpdate();
+
+        testingSlashing = true;
+        vm.expectRevert(TransferFailed.selector);
+        vm.prank(claire);
+        fraxStaker.slashStaker(bob, 1e18);
+        testingSlashing = false;
     }
 
     function test_freezeStaker() public {
@@ -1055,5 +1105,177 @@ contract Unit_Test_FraxStaker is BaseTestVeFXS, FraxStakerStructs, OwnedUpgradea
         vm.expectRevert(ContractPaused.selector);
         vm.prank(bob);
         fraxStaker.stakeFrax{ value: 10e18 }(alice);
+    }
+
+    function test_receive() public {
+        fraxStakerSetup();
+
+        vm.expectRevert(InvalidStakeAmount.selector);
+        vm.prank(bob);
+        address(fraxStaker).call{ value: 0 }("");
+
+        vm.expectEmit(true, false, false, true);
+        emit StakeUpdated(bob, 0, 50e18);
+        vm.prank(bob);
+        address(fraxStaker).call{ value: 50e18 }("");
+
+        Stake memory stakeEntry;
+        (stakeEntry.amountStaked,,, stakeEntry.unlockTime,, stakeEntry.initiatedWithdrawal) = fraxStaker.stakes(bob);
+
+        assertEq(stakeEntry.amountStaked, 50e18);
+        assertEq(stakeEntry.unlockTime, 0);
+        assertFalse(stakeEntry.initiatedWithdrawal);
+        assertEq(fraxStaker.balanceOf(bob), 50e18);
+        assertApproxEqAbs(bob.balance, bobBalance - 50e18, 1e15);
+        assertEq(address(fraxStaker).balance, 50e18);
+
+        vm.expectEmit(true, false, false, true);
+        emit StakeUpdated(bob, 50e18, 75e18);
+        vm.prank(bob);
+        address(fraxStaker).call{ value: 25e18 }("");
+
+        (stakeEntry.amountStaked,,, stakeEntry.unlockTime,, stakeEntry.initiatedWithdrawal) = fraxStaker.stakes(bob);
+
+        assertEq(stakeEntry.amountStaked, 75e18);
+        assertEq(stakeEntry.unlockTime, 0);
+        assertFalse(stakeEntry.initiatedWithdrawal);
+        assertEq(fraxStaker.balanceOf(bob), 75e18);
+        assertApproxEqAbs(bob.balance, bobBalance - 75e18, 1e15);
+        assertEq(address(fraxStaker).balance, 75e18);
+
+        vm.expectEmit(true, false, false, true);
+        emit StakeUpdated(alice, 0, 5e18);
+        vm.prank(alice);
+        address(fraxStaker).call{ value: 5e18 }("");
+
+        (stakeEntry.amountStaked,,, stakeEntry.unlockTime,, stakeEntry.initiatedWithdrawal) = fraxStaker.stakes(bob);
+
+        assertEq(stakeEntry.amountStaked, 75e18);
+        assertEq(stakeEntry.unlockTime, 0);
+        assertFalse(stakeEntry.initiatedWithdrawal);
+        assertEq(fraxStaker.balanceOf(bob), 75e18);
+        assertEq(fraxStaker.balanceOf(alice), 5e18);
+        assertApproxEqAbs(bob.balance, bobBalance - 75e18, 1e15);
+        assertApproxEqAbs(alice.balance, aliceBalance - 5e18, 1e15);
+        assertEq(address(fraxStaker).balance, 80e18);
+        (stakeEntry.amountStaked,,,,,) = fraxStaker.stakes(alice);
+        assertEq(stakeEntry.amountStaked, 5e18);
+
+        vm.prank(bob);
+        fraxStaker.initiateWithdrawal();
+
+        vm.expectRevert(WithdrawalInitiated.selector);
+        vm.prank(bob);
+        address(fraxStaker).call{ value: 10e18 }("");
+
+        fraxStaker.addFraxSentinel(bob);
+        vm.prank(bob);
+        fraxStaker.freezeStaker(alice);
+
+        vm.expectRevert(FrozenStaker.selector);
+        vm.prank(claire);
+        address(fraxStaker).call{ value: 10e18 }("");
+
+        vm.expectRevert(FrozenStaker.selector);
+        vm.prank(alice);
+        address(fraxStaker).call{ value: 10e18 }("");
+
+        vm.prank(bob);
+        fraxStaker.blacklistStaker(alice);
+
+        vm.expectRevert(BlacklistedStaker.selector);
+        vm.prank(claire);
+        address(fraxStaker).call{ value: 10e18 }("");
+
+        vm.expectRevert(BlacklistedStaker.selector);
+        vm.prank(alice);
+        address(fraxStaker).call{ value: 10e18 }("");
+
+        vm.prank(frank);
+        fraxStaker.stopOperation();
+        vm.expectRevert(ContractPaused.selector);
+        vm.prank(bob);
+        address(fraxStaker).call{ value: 10e18 }("");
+    }
+
+    function test_donate() public {
+        fraxStakerSetup();
+
+        uint256 initialBalance = address(fraxStaker).balance;
+
+        fraxStaker.donate{ value: 50e18 }();
+        vm.prank(bob);
+        fraxStaker.donate{ value: 5e18 }();
+        vm.prank(alice);
+        fraxStaker.donate{ value: 10e18 }();
+
+        assertEq(address(fraxStaker).balance, initialBalance + 65e18);
+    }
+
+    function test_recoverFrax() public {
+        fraxStakerSetup();
+
+        vm.expectRevert(OnlyOwner.selector);
+        vm.prank(bob);
+        fraxStaker.recoverFrax(10e18);
+
+        vm.expectRevert(TransferFailed.selector);
+        fraxStaker.recoverFrax(1e18);
+
+        address(fraxStaker).call{ value: 100e18 }("");
+        uint256 initialBalance = address(fraxStaker).balance;
+        uint256 initialThisBalance = address(this).balance;
+
+        vm.expectEmit(true, false, false, true);
+        emit RecoveredFrax(10e18);
+        fraxStaker.recoverFrax(10e18);
+
+        assertEq(initialThisBalance + 10e18, address(this).balance);
+        assertEq(address(fraxStaker).balance, initialBalance - 10e18);
+
+        Reentrant reentrant = new Reentrant();
+        fraxStaker.nominateNewOwner(address(reentrant));
+        vm.prank(address(reentrant));
+        fraxStaker.acceptOwnership();
+
+        vm.recordLogs();
+        vm.expectRevert(TransferFailed.selector);
+        vm.prank(address(reentrant));
+        fraxStaker.recoverFrax(10e18);
+    }
+
+    receive() external payable {
+        // Allow the test contract to receive FRAX
+        if (testingSlashing) {
+            while (fraxStaker.balanceOf(bob) > msg.value) {
+                fraxStaker.slashStaker(bob, msg.value);
+            }
+        }
+    }
+}
+
+contract Reentrant {
+    receive() external payable {
+        FraxStaker fraxStaker = FraxStaker(payable(msg.sender));
+
+        while (msg.sender.balance > msg.value) {
+            fraxStaker.recoverFrax(msg.value);
+        }
+    }
+}
+
+contract ReentrantWithdraw {
+    receive() external payable {
+        FraxStaker fraxStaker = FraxStaker(payable(msg.sender));
+
+        while (msg.sender.balance > msg.value) {
+            fraxStaker.withdrawStake();
+        }
+    }
+}
+
+contract DisabledReceive {
+    receive() external payable {
+        revert("Revert");
     }
 }

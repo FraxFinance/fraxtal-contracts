@@ -18,7 +18,7 @@ import { IFraxStakerEvents } from "./IFraxStakerEvents.sol";
 /**
  * @title IFraxStakerStructs
  * @author Frax Finance
- * @notice A collection of structs used by the Frax Staking system.
+ * @notice A collection of structs used by the FraxStaker system.
  */
 contract FraxStakerStructs is IFraxStakerErrors, IFraxStakerEvents {
     /**

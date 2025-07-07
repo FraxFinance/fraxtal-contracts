@@ -40,7 +40,7 @@ contract DeployFraxStaker is BaseScript {
         implementation.initialize({ _owner: owner, _version: "FraxStaker_v1.0.0" });
 
         // Set the VeFXS interface to the proxy (note: not needed - for testing clarity)
-        stakedFrax = FraxStaker(address(proxy));
+        stakedFrax = FraxStaker(payable(address(proxy)));
     }
 
     function runTest(address _owner, string memory _saltString) external returns (FraxStaker) {

@@ -74,7 +74,7 @@ contract DeployVestedFXS is BaseScript {
         // Upgrade proxy to implementation and call initialize
         bytes memory data = abi.encodeCall(
             implementation.initialize,
-            (eventualAdmin, token, "Vested FXS", "veFXS", "veFXS_2.0.0")
+            (eventualAdmin, token, "Vested FXS", "veFXS", "veFXS_2.0.0", false)
         );
         proxy.upgradeToAndCall({ _implementation: address(implementation), _data: data });
         // Pass same arguments to implementation
@@ -83,7 +83,8 @@ contract DeployVestedFXS is BaseScript {
             _tokenAddr: token,
             _name: "Vested FXS",
             _symbol: "veFXS",
-            _version: "veFXS_2.0.0"
+            _version: "veFXS_2.0.0",
+            _setZerothPointHistory: false
         });
 
         // Set proxy owner to ProxyAdmin

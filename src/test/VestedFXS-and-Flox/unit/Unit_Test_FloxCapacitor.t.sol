@@ -13,13 +13,17 @@ contract Unit_Test_FloxCapacitor is BaseTestVeFXS, IFloxCapacitorErrors, IFloxCa
     function floxCapSetup() public {
         console.log("defaultSetup() called");
         super.defaultSetup();
+        floxCap.setFloxConverter(payable(address(floxConverter)));
 
-        // Mint FXS to the test users
-        token.mint(alice, 100e18);
-        token.mint(bob, 100e18);
+        // Mint FXTL points to the test users
+        token.mint(alice, 1e6);
+        token.mint(bob, 1e6);
 
         // Set frank as the Flox contributor
         floxCap.addFloxContributor(frank);
+
+        vm.expectRevert(AlreadyInitialized.selector);
+        floxCap.initialize(payable(address(fraxStaker)), bob, address(token), 4, "FloxCAP_v2.0.0");
     }
 
     function test_commitTransferOwnership() public {
@@ -52,49 +56,6 @@ contract Unit_Test_FloxCapacitor is BaseTestVeFXS, IFloxCapacitorErrors, IFloxCa
         vm.expectRevert(OwnerCannotBeZeroAddress.selector);
         hoax(bob);
         floxCap.nominateNewOwner(address(0));
-    }
-
-    function test_stopOperation() public {
-        floxCapSetup();
-
-        assertFalse(floxCap.isPaused());
-
-        vm.expectEmit(false, false, false, true);
-        emit OperationPaused(true, block.timestamp);
-        hoax(frank);
-        floxCap.stopOperation();
-        assertTrue(floxCap.isPaused());
-
-        vm.expectRevert(NotFloxContributor.selector);
-        hoax(bob);
-        floxCap.stopOperation();
-
-        vm.expectRevert(ContractPaused.selector);
-        hoax(frank);
-        floxCap.stopOperation();
-    }
-
-    function test_restartOperation() public {
-        floxCapSetup();
-
-        assertFalse(floxCap.isPaused());
-
-        vm.expectEmit(false, false, false, true);
-        emit OperationPaused(true, block.timestamp);
-        hoax(frank);
-        floxCap.stopOperation();
-        assertTrue(floxCap.isPaused());
-
-        vm.expectRevert(OnlyOwner.selector);
-        hoax(frank);
-        floxCap.restartOperation();
-
-        vm.expectEmit(false, false, false, true);
-        emit OperationPaused(false, block.timestamp);
-        floxCap.restartOperation();
-
-        vm.expectRevert(ContractOperational.selector);
-        floxCap.restartOperation();
     }
 
     function test_updateVeFraxDivisor() public {
@@ -171,6 +132,23 @@ contract Unit_Test_FloxCapacitor is BaseTestVeFXS, IFloxCapacitorErrors, IFloxCa
         floxCap.disableVeFraxUse();
     }
 
+    function test_setFloxConverter() public {
+        floxCapSetup();
+
+        assertEq(address(floxCap.floxConverter()), address(floxConverter));
+
+        vm.expectRevert(OnlyOwner.selector);
+        hoax(frank);
+        floxCap.setFloxConverter(payable(address(fraxStaker)));
+
+        vm.expectRevert(OnlyOwner.selector);
+        hoax(bob);
+        floxCap.setFloxConverter(payable(address(token)));
+
+        vm.expectRevert(AlreadyInitialized.selector);
+        floxCap.setFloxConverter(payable(address(token)));
+    }
+
     function test_addFloxContributor() public {
         floxCapSetup();
 
@@ -235,13 +213,33 @@ contract Unit_Test_FloxCapacitor is BaseTestVeFXS, IFloxCapacitorErrors, IFloxCa
 
         vm.mockCall(address(veFXSAggregator), abi.encodeWithSelector(VeFXSAggregator.balanceOf.selector, address(alice)), abi.encode(400e18));
 
-        assertEq(floxCap.balanceOf(alice), 50e18 + (400e18 / divisor));
-        assertEq(floxCap.balanceOf(bob), 25e18 + (100e18 / divisor));
+        assertEq(floxCap.balanceOf(alice), 50e18 + 5e18);
+        assertEq(floxCap.balanceOf(bob), 25e18 + 5e18);
+
+        vm.mockCall(address(veFXSAggregator), abi.encodeWithSelector(VeFXSAggregator.balanceOf.selector, address(bob)), abi.encode(4e18));
+
+        vm.mockCall(address(veFXSAggregator), abi.encodeWithSelector(VeFXSAggregator.balanceOf.selector, address(alice)), abi.encode(4e16));
+
+        assertEq(floxCap.balanceOf(alice), 50e18 + 1e16);
+        assertEq(floxCap.balanceOf(bob), 25e18 + 1e18);
 
         hoax(frank);
         floxCap.disableVeFraxUse();
         assertEq(floxCap.balanceOf(alice), 50e18);
         assertEq(floxCap.balanceOf(bob), 25e18);
+
+        hoax(frank);
+        floxCap.delegate(alice, bob);
+        hoax(dave);
+        token.approve(address(fraxStaker), 100e18);
+        hoax(dave);
+        fraxStaker.stakeFrax{ value: 15e18 }();
+        hoax(frank);
+        floxCap.delegate(dave, bob);
+
+        assertEq(floxCap.balanceOf(alice), 0);
+        assertEq(floxCap.balanceOf(bob), 50e18 + 25e18 + 15e18);
+        assertEq(floxCap.balanceOf(dave), 0);
     }
 
     function test_delegate() public {
@@ -292,6 +290,14 @@ contract Unit_Test_FloxCapacitor is BaseTestVeFXS, IFloxCapacitorErrors, IFloxCa
         assertEq(floxCap.incomingDelegationsCount(frank), 1);
         assertEq(floxCap.incomingDelegations(frank, 0), bob);
         assertEq(floxCap.balanceOf(frank), 25e18);
+
+        vm.expectRevert(ZeroAddress.selector);
+        hoax(frank);
+        floxCap.delegate(whale, address(0));
+
+        vm.expectRevert(ZeroAddress.selector);
+        hoax(frank);
+        floxCap.delegate(address(0), whale);
     }
 
     function test_bulkDelegate() public {
@@ -378,15 +384,19 @@ contract Unit_Test_FloxCapacitor is BaseTestVeFXS, IFloxCapacitorErrors, IFloxCa
         assertEq(floxCap.balanceOf(bob), 25e18);
 
         hoax(frank);
+        floxCap.delegate(claire, bob);
+        hoax(frank);
         floxCap.delegate(alice, bob);
         hoax(frank);
-        floxCap.delegate(claire, bob);
+        floxCap.delegate(dave, bob);
+        hoax(frank);
+        floxCap.delegate(eric, bob);
         hoax(frank);
         floxCap.delegate(frank, bob);
 
         assertEq(floxCap.delegations(alice), bob);
-        assertEq(floxCap.incomingDelegationsCount(bob), 3);
-        assertEq(floxCap.incomingDelegations(bob, 0), alice);
+        assertEq(floxCap.incomingDelegationsCount(bob), 5);
+        assertEq(floxCap.incomingDelegations(bob, 1), alice);
         assertEq(floxCap.balanceOf(alice), 0);
         assertEq(floxCap.balanceOf(bob), 75e18);
 
@@ -404,10 +414,14 @@ contract Unit_Test_FloxCapacitor is BaseTestVeFXS, IFloxCapacitorErrors, IFloxCa
         floxCap.revokeDelegation(alice);
 
         assertEq(floxCap.delegations(alice), address(0));
-        assertEq(floxCap.incomingDelegationsCount(bob), 2);
-        assertEq(floxCap.incomingDelegations(bob, 0), frank);
+        assertEq(floxCap.incomingDelegationsCount(bob), 4);
+        assertEq(floxCap.incomingDelegations(bob, 1), frank);
         assertEq(floxCap.balanceOf(alice), 50e18);
         assertEq(floxCap.balanceOf(bob), 25e18);
+
+        vm.expectRevert(ZeroAddress.selector);
+        hoax(frank);
+        floxCap.revokeDelegation(address(0));
     }
 
     function test_bulkRevokeDelegation() public {
@@ -496,6 +510,11 @@ contract Unit_Test_FloxCapacitor is BaseTestVeFXS, IFloxCapacitorErrors, IFloxCa
         assertEq(floxCap.balanceOf(dave), 15e18);
 
         vm.expectRevert(NoActiveDelegations.selector);
+        hoax(frank);
+        floxCap.bulkRevokeDelegation(delegators);
+
+        delegators[0] = address(0);
+        vm.expectRevert(ZeroAddress.selector);
         hoax(frank);
         floxCap.bulkRevokeDelegation(delegators);
     }

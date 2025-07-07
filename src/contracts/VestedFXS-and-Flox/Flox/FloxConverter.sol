@@ -17,20 +17,29 @@ import { FloxConverterStructs } from "./interfaces/FloxConverterStructs.sol";
 import { FloxCapacitor } from "./FloxCapacitor.sol";
 import { FxtlPoints } from "./FxtlPoints.sol";
 
+import { console } from "forge-std/console.sol";
+
 /**
  * @title FloxConverter
  * @author Frax Finance
- * @notice A smart contract that allows users to convert their FXTL points to FRAX.
+ * @notice A smart contract that allows users to "convert" their FXTL points to FRAX. FXTL is not actually burned from the user, but redemptions are tracked to keep a "virtual" balance (see totalEligibleFxtlPointsByUser()).
+ * @dev Used to virtually "convert" a percentage of user's FXTL points to FRAX. We have a set yearly (and subsequently weekly) emission amount
+ *   and the users get a share of it based on their balances as well as boost determined by their FloxCapacitor balance.
+ * @dev We should be able to populate the epoch data using the flox stake units calculated from 2% of user's unclaimed FXTL point balance and their FloxCapacitor balance.
+ * @dev Once all the data is populated the FRAX should be distributed (by a trusted entity / bot) to the users using bulk actions.
+ * @dev The users themselves do not interact (write) with this FloxConverter contract
+ * @dev We need to keep track of the amount of points the user has already used to redeem their FRAX,
+ *  because the FXTL smart contract will be used to aggregate the points through perpetuity and we won't be physically burning / removing user's redeemed points from their FXTL ERC20 balance.
  * @dev The Flox Converter uses Flox Capacitor to boost the user's stake when claiming the FRAX token.
  */
 contract FloxConverter is OwnedUpgradeable, FloxConverterStructs {
-    /// Instantiation of the Flox Capacitor smart contract.
+    /// @notice Instantiation of the Flox Capacitor smart contract.
     FloxCapacitor public FLOX_CAPACITOR;
 
-    /// Instantiation of the FXTL points smart contract.
+    /// @notice Instantiation of the FXTL points smart contract.
     FxtlPoints public FXTL_POINTS;
 
-    /// The maximum amount of basis points used in calculations to increase precision (equals 100%).
+    /// @notice The maximum amount of basis points used in calculations to increase precision (equals 100%).
     uint256 public constant MAX_BASIS_POINTS = 1e5;
 
     /**
@@ -40,25 +49,25 @@ contract FloxConverter is OwnedUpgradeable, FloxConverterStructs {
      */
     mapping(address contributor => bool isContributor) public isFloxContributor;
     /**
-     * @notice Used to track the redeemal epochs.
+     * @notice Used to track the redemption epochs.
      * @dev epochNumber The number of the epoch.
      * @dev epoch The struct that contains the information of the epoch.
      */
-    mapping(uint256 epochNumber => RedeemalEpoch epoch) public redeemalEpochs;
+    mapping(uint256 epochNumber => RedemptionEpoch epoch) public redemptionEpochs;
     /**
-     * @notice Used to track the user data in the redeemal epochs.
-     * @dev epochNumber The number of the redeemal epoch.
+     * @notice Used to track the user data in the redemption epochs.
+     * @dev epochNumber The number of the redemption epoch.
      * @dev user The address of the user.
      * @dev userData The struct that contains the information of the user in the epoch.
      */
-    mapping(uint256 epochNumber => mapping(address user => RedeemalEpochUserData userData))
-        public redeemalEpochUserData;
+    mapping(uint256 epochNumber => mapping(address user => RedemptionEpochUserData userData))
+        public redemptionEpochUserData;
     /**
-     * @notice Used to track the total amonut og Flox stake units per redeemal epoch.
-     * @dev epochNumber The number of the redeemal epoch.
-     * @dev totalFloxStakeUnits The total amount of Flox stake units in the redeemal epoch.
+     * @notice Used to track the total amonut og Flox stake units per redemption epoch.
+     * @dev epochNumber The number of the redemption epoch.
+     * @dev totalFloxStakeUnits The total amount of Flox stake units in the redemption epoch.
      */
-    mapping(uint256 epochNumber => uint256 totalFloxStakeUnits) public totalFloxStakeUnitsPerRedeemalEpoch;
+    mapping(uint256 epochNumber => uint256 totalFloxStakeUnits) public totalFloxStakeUnitsPerRedemptionEpoch;
     /**
      * @notice Used to track the total user data in the Flox Converter.
      * @dev user The address of the user.
@@ -66,22 +75,35 @@ contract FloxConverter is OwnedUpgradeable, FloxConverterStructs {
      */
     mapping(address user => UserData userData) public userStats;
 
-    /// Version of the FloxConverter smart contract.
+    /// @notice Version of the FloxConverter smart contract.
     string public version;
-    /// Variable to track if the contract is paused.
+
+    /// @notice Variable to track if the contract is paused.
     bool public isPaused;
-    /// Used to make sure the contract is initialized only once.
+
+    /// @notice Used to make sure the contract is initialized only once.
     bool private _initialized;
-    /// Used to prevent reentrancy attacks.
+
+    /// @notice Used to prevent reentrancy attacks.
     bool private executing;
-    /// Used to track the number of allocated weekly distribution epochs.
+
+    /// @notice Used to track the number of allocated weekly distribution epochs.
     uint256 public latestAllocatedDistributionEpoch;
-    /// Used to track the total amount of FXTL points redeemed for FRAX.
+
+    /// @notice Used to track the total amount of FXTL points redeemed for FRAX.
     uint256 public totalFxtlPointsRedeemed;
-    /// Amount of FRAX to distribute in a year.
+
+    /// @notice Amount of FRAX to distribute in a year.
     uint256 public yearlyFraxDistribution;
-    /// Percentage of FXTL points to redeem per redeemal epoch.
+
+    /// @notice Percentage of FXTL points to redeem per redemption epoch.
     uint256 public basisPointsToRedeemPerEpoch;
+
+    /// @notice Amount of FXTL points per FRAX staked in order to get the maximum Flox stake boost.
+    uint256 public fxtlPointsPerOneFrax;
+
+    /// @notice Maximum Flox Stake Units boost.
+    uint256 public maxFloxStakeUnitsBoost;
 
     /// @dev reserve extra storage for future upgrades
     uint256[50] private __gap;
@@ -102,6 +124,8 @@ contract FloxConverter is OwnedUpgradeable, FloxConverterStructs {
         version = _version;
 
         basisPointsToRedeemPerEpoch = 2000; // 2% of the FXTL points
+        fxtlPointsPerOneFrax = 1000; // 1000 FXTL points per 1 FRAX staked to get the maximum Flox stake boost
+        maxFloxStakeUnitsBoost = 2; // By reaching the maximum Flox Stake Units boost, the user can double their Flox stake units in the epoch
 
         __Owned_init(_owner);
     }
@@ -120,98 +144,154 @@ contract FloxConverter is OwnedUpgradeable, FloxConverterStructs {
      * @notice Returns the amount of FRAX available to be distributed weekly.
      * @dev The amount of FRAX available for distribution is calculated based on the yearly distribution and
      *  recalculated using daily precision.
-     * @return The amount of FRAX available for distribution weekly
+     * @return _availableFrax The amount of FRAX available for distribution weekly
      */
-    function weeklyAvailableFrax() public view returns (uint256) {
-        uint256 availableFrax = ((yearlyFraxDistribution * MAX_BASIS_POINTS * 7 days) / 365 days) / MAX_BASIS_POINTS;
-
-        return availableFrax;
+    function weeklyAvailableFrax() public view returns (uint256 _availableFrax) {
+        return ((yearlyFraxDistribution * MAX_BASIS_POINTS * 7 days) / 365 days) / MAX_BASIS_POINTS;
     }
 
     /**
-     * @notice Returns the amount of FXTL points elegible to be redeemed in the current redeemal epoch.
+     * @notice User's FXTL points eligible for current AND future conversions. FXTL ERC20 balance - total redeemed.
      * @param _user The address of the user
-     * @return The amount of FXTL points elegible to be redeemed in the current redeemal epoch
+     * @return _ttlFxtlPoints The total amount of FXTL points eligible to be redeemed in current AND future redemption epochs
      */
-    function getCurrentUserRedeemalEpochFxtlPoints(address _user) public view returns (uint256) {
-        uint256 fxtlPoints = FXTL_POINTS.balanceOf(_user);
-        fxtlPoints -= userStats[_user].totalFxtlPointsRedeemed;
-        fxtlPoints = (fxtlPoints * basisPointsToRedeemPerEpoch) / MAX_BASIS_POINTS;
-
-        return fxtlPoints;
+    function totalEligibleFxtlPointsByUser(address _user) public view returns (uint256 _ttlFxtlPoints) {
+        _ttlFxtlPoints = FXTL_POINTS.balanceOf(_user);
+        _ttlFxtlPoints -= userStats[_user].totalFxtlPointsRedeemed;
     }
 
     /**
-     * @notice Returns the amount of FXTL points elegible to be redeemed in the current redeemal epoch for multiple
+     * @notice Returns the amount of FXTL points eligible to be redeemed in the current redemption epoch only.
+     * @param _user The address of the user
+     * @return _epochFxtlPoints The amount of FXTL points eligible to be redeemed in the current redemption epoch only
+     */
+    function getCurrentUserRedemptionEpochFxtlPoints(address _user) public view returns (uint256 _epochFxtlPoints) {
+        _epochFxtlPoints = totalEligibleFxtlPointsByUser(_user);
+        _epochFxtlPoints = (_epochFxtlPoints * basisPointsToRedeemPerEpoch) / MAX_BASIS_POINTS;
+    }
+
+    /**
+     * @notice Returns the amount of FXTL points eligible to be redeemed in the current redemption epoch for multiple
      *  users at the same time.
      * @param _users An array of user addresses
-     * @return The amount of FXTL points elegible to be redeemed in the current redeemal epoch
+     * @return _userFxtlPointsThisEpoch The amount of FXTL points eligible to be redeemed in the current redemption epoch
      */
-    function bulkGetCurrentUserRedeemalEpochFxtlPoints(address[] memory _users) public view returns (uint256[] memory) {
-        uint256[] memory fxtlPoints = new uint256[](_users.length);
+    function bulkGetCurrentUserRedemptionEpochFxtlPoints(
+        address[] memory _users
+    ) public view returns (uint256[] memory _userFxtlPointsThisEpoch) {
+        _userFxtlPointsThisEpoch = new uint256[](_users.length);
 
         for (uint256 i; i < _users.length; ) {
-            fxtlPoints[i] = FXTL_POINTS.balanceOf(_users[i]);
-            fxtlPoints[i] -= userStats[_users[i]].totalFxtlPointsRedeemed;
-            fxtlPoints[i] = (fxtlPoints[i] * basisPointsToRedeemPerEpoch) / MAX_BASIS_POINTS;
+            _userFxtlPointsThisEpoch[i] = getCurrentUserRedemptionEpochFxtlPoints(_users[i]);
 
             unchecked {
                 ++i;
             }
         }
-
-        return fxtlPoints;
     }
 
     /**
-     * @notice Returns the amount of FRAX elegible to be redeemed in the current redeemal epoch for given Flox stake
+     * @notice Returns the amount of Flox stake units for a given user.
+     * @dev The Flox stake units are calculated based on the FXTL points and the Flox Capacitor balance.
+     * @param _user The address of the user
+     * @return _floxStakeUnits The amount of Flox stake units for the user
+     */
+    function calculateFloxStakeUnits(address _user) public view returns (uint256 _floxStakeUnits) {
+        uint256 usrFxtlPtsThisEpoch = getCurrentUserRedemptionEpochFxtlPoints(_user);
+        if (usrFxtlPtsThisEpoch == 0) return 0;
+
+        uint256 floxCapBalance = FLOX_CAPACITOR.balanceOf(_user);
+
+        // We need to scale up FXTL points to the amount of FRAX decimals
+        uint256 maxBoostRequiredBalance = (usrFxtlPtsThisEpoch * 1e18) / fxtlPointsPerOneFrax;
+
+        // Get the boost in basis points
+        uint256 floxCapBoostBPs;
+        if (floxCapBalance >= maxBoostRequiredBalance) {
+            floxCapBoostBPs = maxFloxStakeUnitsBoost * MAX_BASIS_POINTS;
+        } else {
+            floxCapBoostBPs =
+                MAX_BASIS_POINTS +
+                (floxCapBalance * (maxFloxStakeUnitsBoost - 1) * MAX_BASIS_POINTS) /
+                maxBoostRequiredBalance;
+        }
+
+        // Return the multiplied epoch points
+        return ((usrFxtlPtsThisEpoch * floxCapBoostBPs) / MAX_BASIS_POINTS);
+    }
+
+    /**
+     * @notice Returns the amount of Flox stake units for multiple users at the same time.
+     * @dev The Flox stake units are calculated based on the FXTL points and the Flox Capacitor balance.
+     * @param _users An array of user addresses
+     * @return _floxStakeUnits An array of Flox stake units for each user
+     */
+    function bulkCalculateFloxStakeUnits(
+        address[] memory _users
+    ) public view returns (uint256[] memory _floxStakeUnits) {
+        _floxStakeUnits = new uint256[](_users.length);
+
+        for (uint256 i; i < _users.length; ) {
+            _floxStakeUnits[i] = calculateFloxStakeUnits(_users[i]);
+
+            unchecked {
+                ++i;
+            }
+        }
+    }
+
+    /**
+     * @notice Returns the amount of FRAX eligible to be redeemed in the current redemption epoch for given Flox stake
      *  units.
      * @param _floxStakeUnits Amount of Flox stake units to calculate the FRAX allocation for
-     * @param _redeemalEpoch The redeemal epoch to calculate the FRAX allocation for
-     * @return The amount of FRAX allocated to the user based on their Flox stake units
+     * @param _redemptionEpoch The redemption epoch to calculate the FRAX allocation for
+     * @return _redeemableFrax The amount of FRAX allocated to the user based on their Flox stake units
      */
     function getFraxAllocationFromFloxStakeUnits(
         uint256 _floxStakeUnits,
-        uint256 _redeemalEpoch
-    ) public view returns (uint256) {
-        _redeemalEpoch = _redeemalEpoch == 0 ? latestAllocatedDistributionEpoch + 1 : _redeemalEpoch;
+        uint256 _redemptionEpoch
+    ) public view returns (uint256 _redeemableFrax) {
+        _redemptionEpoch = _redemptionEpoch == 0 ? latestAllocatedDistributionEpoch + 1 : _redemptionEpoch;
 
-        if (!redeemalEpochs[_redeemalEpoch].initiated) revert UninitiatedRedeemalEpoch();
+        if (!redemptionEpochs[_redemptionEpoch].initiated) revert UninitiatedRedemptionEpoch();
 
-        uint256 redeemalEpochAvailableFrax = weeklyAvailableFrax();
-        uint256 totalFloxStakeUnits = redeemalEpochs[_redeemalEpoch].totalFloxStakeUnits;
+        uint256 redemptionEpochAvailableFrax = weeklyAvailableFrax();
+        uint256 totalFloxStakeUnits = redemptionEpochs[_redemptionEpoch].totalFloxStakeUnits;
 
         return
-            ((redeemalEpochAvailableFrax * _floxStakeUnits * MAX_BASIS_POINTS) / totalFloxStakeUnits) /
+            ((redemptionEpochAvailableFrax * _floxStakeUnits * MAX_BASIS_POINTS) / totalFloxStakeUnits) /
             MAX_BASIS_POINTS;
     }
 
     /* ====================== CORE OPERATION FUNCTIONS ====================== */
 
     /**
-     * @notice Used to initiate the redeemal epoch.
-     * @param _lastBlock The last block of the redeemal epoch
+     * @notice Used to initiate the redemption epoch.
+     * @param _lastBlock The last block of the redemption epoch
      */
-    function initiateRedeemalEpoch(uint64 _lastBlock) external {
+    function initiateRedemptionEpoch(uint64 _lastBlock) external {
         _onlyFloxContributor();
-        if (isPaused) revert ContractPaused();
+        _onlyWhenOperational();
         if (_lastBlock == 0) revert InvalidLastBlockNumber();
 
-        uint64 firstBlock = redeemalEpochs[latestAllocatedDistributionEpoch].lastBlock + 1;
+        // Start right after the last block of the previous epoch
+        uint64 firstBlock = redemptionEpochs[latestAllocatedDistributionEpoch].lastBlock + 1;
         uint256 fraxToDistribute = weeklyAvailableFrax();
 
+        // The redemption end block must be after the previous epoch's final block and before the current block
         if (_lastBlock < firstBlock || _lastBlock > block.number) revert InvalidLastBlockNumber();
 
-        RedeemalEpoch storage epoch = redeemalEpochs[latestAllocatedDistributionEpoch + 1];
+        // Set the epoch info
+        RedemptionEpoch storage epoch = redemptionEpochs[latestAllocatedDistributionEpoch + 1];
         epoch.initiated = true;
         epoch.firstBlock = firstBlock;
         epoch.lastBlock = _lastBlock;
 
-        emit RedeemalEpochInitiated(latestAllocatedDistributionEpoch + 1, firstBlock, _lastBlock, fraxToDistribute);
+        emit RedemptionEpochInitiated(latestAllocatedDistributionEpoch + 1, firstBlock, _lastBlock, fraxToDistribute);
     }
 
     /**
-     * @notice Used to update the user's data for the currently initiated redeemal epoch.
+     * @notice Used to update the user's data for the currently initiated redemption epoch.
      * @dev This can only be called by a Flox contributor.
      * @dev The function will revert if the smart contract is paused.
      * @dev The function will revert if the amount of FXTL points redeemed is 0.
@@ -221,20 +301,20 @@ contract FloxConverter is OwnedUpgradeable, FloxConverterStructs {
      */
     function updateUserData(address _user, uint256 _amountOfFxtlPointsRedeemed, uint256 _floxStakeUnits) external {
         _onlyFloxContributor();
-        if (isPaused) revert ContractPaused();
+        _onlyWhenOperational();
 
-        RedeemalEpoch memory epoch = redeemalEpochs[latestAllocatedDistributionEpoch + 1];
+        RedemptionEpoch memory epoch = redemptionEpochs[latestAllocatedDistributionEpoch + 1];
         if (!epoch.initiated) revert EpochNotInitiated();
         if (epoch.populated) revert EpochAlreadyPopulated();
 
         if (_amountOfFxtlPointsRedeemed == 0) revert InvalidFxtlPointsAmount();
 
         _updateUserStats(_user, _amountOfFxtlPointsRedeemed, _floxStakeUnits);
-        _updateRedeemalEpochUserData(_user, _amountOfFxtlPointsRedeemed, _floxStakeUnits);
+        _updateRedemptionEpochUserData(_user, _amountOfFxtlPointsRedeemed, _floxStakeUnits);
     }
 
     /**
-     * @notice Used to update multiple users' data for the currently initiated redeemal epoch.
+     * @notice Used to update multiple users' data for the currently initiated redemption epoch.
      * @dev This can only be called by a Flox contributor.
      * @dev The function will revert if the smart contract is paused.
      * @dev The function will revert if the amount of FXTL points redeemed is 0.
@@ -249,11 +329,12 @@ contract FloxConverter is OwnedUpgradeable, FloxConverterStructs {
         uint256[] memory _floxStakeUnits
     ) external {
         _onlyFloxContributor();
-        if (isPaused) revert ContractPaused();
-        if (_users.length != _amountsOfFxtlPointsRedeemed.length || _users.length != _floxStakeUnits.length)
+        _onlyWhenOperational();
+        if (_users.length != _amountsOfFxtlPointsRedeemed.length || _users.length != _floxStakeUnits.length) {
             revert InvalidArrayLength();
+        }
 
-        RedeemalEpoch memory epoch = redeemalEpochs[latestAllocatedDistributionEpoch + 1];
+        RedemptionEpoch memory epoch = redemptionEpochs[latestAllocatedDistributionEpoch + 1];
         if (!epoch.initiated) revert EpochNotInitiated();
         if (epoch.populated) revert EpochAlreadyPopulated();
 
@@ -261,7 +342,7 @@ contract FloxConverter is OwnedUpgradeable, FloxConverterStructs {
             if (_amountsOfFxtlPointsRedeemed[i] == 0) revert InvalidFxtlPointsAmount();
 
             _updateUserStats(_users[i], _amountsOfFxtlPointsRedeemed[i], _floxStakeUnits[i]);
-            _updateRedeemalEpochUserData(_users[i], _amountsOfFxtlPointsRedeemed[i], _floxStakeUnits[i]);
+            _updateRedemptionEpochUserData(_users[i], _amountsOfFxtlPointsRedeemed[i], _floxStakeUnits[i]);
 
             unchecked {
                 ++i;
@@ -270,24 +351,24 @@ contract FloxConverter is OwnedUpgradeable, FloxConverterStructs {
     }
 
     /**
-     * @notice Used to mark the redeemal epoch as populated.
-     * @dev Once the redeemal epoch is marked as populated, the data cannot be changed and the FRAX distribution can
+     * @notice Used to mark the redemption epoch as populated.
+     * @dev Once the redemption epoch is marked as populated, the data cannot be changed and the FRAX distribution can
      *  be started.
      * @dev This can only be called by a Flox contributor.
      * @dev The function will revert if the smart contract is paused.
      * @dev The function will revert if the epoch is not initialized or already finalized.
      */
-    function markRedeemalEpochAsPopulated() external {
+    function markRedemptionEpochAsPopulated() external {
         _onlyFloxContributor();
-        if (isPaused) revert ContractPaused();
+        _onlyWhenOperational();
 
-        RedeemalEpoch storage epoch = redeemalEpochs[latestAllocatedDistributionEpoch + 1];
+        RedemptionEpoch storage epoch = redemptionEpochs[latestAllocatedDistributionEpoch + 1];
         if (!epoch.initiated) revert EpochNotInitiated();
         if (epoch.populated) revert EpochAlreadyPopulated();
 
         epoch.populated = true;
 
-        emit RedeemalEpochPopulated(
+        emit RedemptionEpochPopulated(
             latestAllocatedDistributionEpoch + 1,
             epoch.firstBlock,
             epoch.lastBlock,
@@ -297,7 +378,7 @@ contract FloxConverter is OwnedUpgradeable, FloxConverterStructs {
 
     /**
      * @notice Used to distribute the FRAX to the users.
-     * @dev This cam only be called by a Flox contributor.
+     * @dev This can only be called by a Flox contributor.
      * @dev The function will revert if the smart contract is paused.
      * @dev The function will revert if the epoch is not initialized and populated or already finalized.
      * @dev The function will revert if the user has already received their FRAX distribution for the distribution epoch.
@@ -306,9 +387,9 @@ contract FloxConverter is OwnedUpgradeable, FloxConverterStructs {
      */
     function distributeFrax(address[] memory _users) external nonReentrant {
         _onlyFloxContributor();
-        if (isPaused) revert ContractPaused();
+        _onlyWhenOperational();
 
-        RedeemalEpoch storage epoch = redeemalEpochs[latestAllocatedDistributionEpoch + 1];
+        RedemptionEpoch storage epoch = redemptionEpochs[latestAllocatedDistributionEpoch + 1];
         if (!epoch.initiated) revert EpochNotInitiated();
         if (!epoch.populated) revert EpochNotPopulated();
         if (epoch.finalized) revert EpochAlreadyFinalized();
@@ -318,16 +399,23 @@ contract FloxConverter is OwnedUpgradeable, FloxConverterStructs {
 
         for (uint256 i; i < _users.length; ) {
             address user = _users[i];
-            RedeemalEpochUserData storage userData = redeemalEpochUserData[latestAllocatedDistributionEpoch + 1][user];
+
+            // Get the pre-calculated user data for this epoch
+            RedemptionEpochUserData storage userData = redemptionEpochUserData[latestAllocatedDistributionEpoch + 1][
+                user
+            ];
             if (userData.fraxReceived != 0) revert AlreadyDistributed(user);
 
+            // Calculate the user's share of this epoch's Frax
             uint256 fraxToDistribute = (totalFraxDistribution * userData.floxStakeUnits) / totalFloxStakeUnits;
 
+            // Send the Frax to the user
             (bool success, ) = user.call{ value: fraxToDistribute }("");
             if (!success) revert DistributionFailed(user);
 
+            // Update the user data and stats, as well as the epoch
             userData.fraxReceived = fraxToDistribute;
-            userStats[user].totalFraxReceived = userStats[user].totalFraxReceived + fraxToDistribute;
+            userStats[user].totalFraxReceived += fraxToDistribute;
             epoch.totalFraxDistributed += fraxToDistribute;
 
             emit DistributionAllocated(user, fraxToDistribute);
@@ -339,15 +427,15 @@ contract FloxConverter is OwnedUpgradeable, FloxConverterStructs {
     }
 
     /**
-     * @notice Used to finalize the redeemal epoch.
+     * @notice Used to finalize the redemption epoch.
      * @dev The function will revert if the smart contract is paused.
      * @dev The function will revert if the epoch is not initialized or already finalized.
      */
-    function finalizeRedeemalEpoch() external {
+    function finalizeRedemptionEpoch() external {
         _onlyFloxContributor();
-        if (isPaused) revert ContractPaused();
+        _onlyWhenOperational();
 
-        RedeemalEpoch storage epoch = redeemalEpochs[latestAllocatedDistributionEpoch + 1];
+        RedemptionEpoch storage epoch = redemptionEpochs[latestAllocatedDistributionEpoch + 1];
         if (!epoch.initiated) revert EpochNotInitiated();
         if (!epoch.populated) revert EpochNotPopulated();
         if (epoch.finalized) revert EpochAlreadyFinalized();
@@ -355,7 +443,7 @@ contract FloxConverter is OwnedUpgradeable, FloxConverterStructs {
         epoch.finalized = true;
         latestAllocatedDistributionEpoch += 1;
 
-        emit RedeemalEpochFinalized(latestAllocatedDistributionEpoch);
+        emit RedemptionEpochFinalized(latestAllocatedDistributionEpoch);
     }
 
     /* ====================== ADMINISTRATIVE FUNCTIONS ====================== */
@@ -391,7 +479,7 @@ contract FloxConverter is OwnedUpgradeable, FloxConverterStructs {
      */
     function stopOperation() external {
         _onlyFloxContributor();
-        if (isPaused) revert ContractPaused();
+        _onlyWhenOperational();
         isPaused = true;
         emit OperationPaused(isPaused, block.timestamp);
     }
@@ -427,7 +515,7 @@ contract FloxConverter is OwnedUpgradeable, FloxConverterStructs {
 
     /**
      * @notice Used to update the user's Flox Converter stats.
-     * @dev We don't want to double-track the stats for the user, so if the user already has the per-redeemal epoch
+     * @dev We don't want to double-track the stats for the user, so if the user already has the per-redemption epoch
      *  stats recorded, the global value will first be rolled back and then updated with the new values.
      * @param _user Address of the user
      * @param _amountOfFxtlPointsRedeemed Amount of FXTL points redeemed by the user
@@ -439,39 +527,39 @@ contract FloxConverter is OwnedUpgradeable, FloxConverterStructs {
         uint256 oldFxtlPointsRedeemed = user.totalFxtlPointsRedeemed;
         uint256 epochNumber = latestAllocatedDistributionEpoch + 1;
 
-        RedeemalEpochUserData memory redeemalEpochData = redeemalEpochUserData[epochNumber][_user];
-        RedeemalEpoch storage redeemalEpoch = redeemalEpochs[epochNumber];
+        RedemptionEpochUserData memory redemptionEpochData = redemptionEpochUserData[epochNumber][_user];
+        RedemptionEpoch storage redemptionEpoch = redemptionEpochs[epochNumber];
 
-        if (redeemalEpochData.fxtlPointsRedeemed != 0) {
-            user.totalFxtlPointsRedeemed -= redeemalEpochData.fxtlPointsRedeemed;
-            redeemalEpoch.totalFxtlPointsRedeemed -= redeemalEpochData.fxtlPointsRedeemed;
-            redeemalEpoch.totalFloxStakeUnits -= redeemalEpochData.floxStakeUnits;
-            totalFxtlPointsRedeemed -= redeemalEpochData.fxtlPointsRedeemed;
+        if (redemptionEpochData.fxtlPointsRedeemed != 0) {
+            user.totalFxtlPointsRedeemed -= redemptionEpochData.fxtlPointsRedeemed;
+            redemptionEpoch.totalFxtlPointsRedeemed -= redemptionEpochData.fxtlPointsRedeemed;
+            redemptionEpoch.totalFloxStakeUnits -= redemptionEpochData.floxStakeUnits;
+            totalFxtlPointsRedeemed -= redemptionEpochData.fxtlPointsRedeemed;
         }
 
         user.totalFxtlPointsRedeemed += _amountOfFxtlPointsRedeemed;
-        redeemalEpoch.totalFxtlPointsRedeemed += _amountOfFxtlPointsRedeemed;
-        redeemalEpoch.totalFloxStakeUnits += _floxStakeUnits;
+        redemptionEpoch.totalFxtlPointsRedeemed += _amountOfFxtlPointsRedeemed;
+        redemptionEpoch.totalFloxStakeUnits += _floxStakeUnits;
         totalFxtlPointsRedeemed += _amountOfFxtlPointsRedeemed;
 
         emit UserStatsUpdated(_user, oldFxtlPointsRedeemed, user.totalFxtlPointsRedeemed);
     }
 
     /**
-     * @notice Used to update the user's redeemal epoch data.
-     * @dev If the user's redeemal epoch data is already present, the function overwrites it.
-     * @param _user Address of the user getting their redeemal epoch data updated
+     * @notice Used to update the user's redemption epoch data.
+     * @dev If the user's redemption epoch data is already present, the function overwrites it.
+     * @param _user Address of the user getting their redemption epoch data updated
      * @param _amountOfFxtlPointsRedeemed Amount of FXTL points redeemed by the user
      * @param _floxStakeUnits Amount of Flox stake units redeemed by the user
      */
-    function _updateRedeemalEpochUserData(
+    function _updateRedemptionEpochUserData(
         address _user,
         uint256 _amountOfFxtlPointsRedeemed,
         uint256 _floxStakeUnits
     ) internal {
         uint256 epochNumber = latestAllocatedDistributionEpoch + 1;
 
-        RedeemalEpochUserData storage userData = redeemalEpochUserData[epochNumber][_user];
+        RedemptionEpochUserData storage userData = redemptionEpochUserData[epochNumber][_user];
 
         userData.fxtlPointsRedeemed = _amountOfFxtlPointsRedeemed;
         userData.floxStakeUnits = _floxStakeUnits;
@@ -509,5 +597,30 @@ contract FloxConverter is OwnedUpgradeable, FloxConverterStructs {
         executing = true;
         _;
         executing = false;
+    }
+
+    /* ====================== EMERGENCIES AND FALLBACK ====================== */
+
+    /**
+     * @notice Fallback function to receive FRAX in order to distribute it.
+     */
+    receive() external payable {
+        // Do nothing.
+    }
+
+    /// @notice For emergencies if something gets stuck
+    /**
+     * @notice Used to recover FRAX from the contract.
+     * @dev This can only be called by the owner.
+     * @dev This transfers the `amount` of FRAX to the owner.
+     * @param _amount The amount of FRAX to recover
+     */
+    function recoverFrax(uint256 _amount) external {
+        _onlyOwner();
+
+        (bool _success, ) = address(owner).call{ value: _amount }("");
+        if (!_success) revert TransferFailed();
+
+        emit RecoveredFrax(_amount);
     }
 }

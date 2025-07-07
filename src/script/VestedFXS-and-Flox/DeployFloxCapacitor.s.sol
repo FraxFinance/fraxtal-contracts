@@ -43,11 +43,14 @@ contract DeployFloxCapacitor is BaseScript {
         Proxy proxy = new Proxy{ salt: salt }(tempAdmin);
 
         // Upgrade proxy to implementation and call initialize
-        bytes memory data = abi.encodeCall(implementation.initialize, (fraxStaker, owner, veFRAX, 4, "FloxCAP_v1.0.0"));
+        bytes memory data = abi.encodeCall(
+            implementation.initialize,
+            (payable(fraxStaker), owner, veFRAX, 4, "FloxCAP_v1.0.0")
+        );
         proxy.upgradeToAndCall({ _implementation: address(implementation), _data: data });
         // Pass same arguments to implementation
         implementation.initialize({
-            _fraxStaker: fraxStaker,
+            _fraxStaker: payable(fraxStaker),
             _owner: owner,
             _veFraxAggregator: veFRAX,
             _veFraxDivisor: 4,

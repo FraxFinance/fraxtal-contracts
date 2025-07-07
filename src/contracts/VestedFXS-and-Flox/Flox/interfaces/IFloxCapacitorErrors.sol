@@ -21,35 +21,20 @@ interface IFloxCapacitorErrors {
     /// Emitted when attempting to delegate to someone when you already have an active delegation.
     error AlreadyDelegated();
 
-    /// Emitted when the owner tries to add a Flox contributor that is already a Flox contributor.
+    /// Emitted when the owner tries to add a Flox contributor that is already an existing Flox contributor.
     error AlreadyFloxContributor();
 
     /// Emitted when the contract is already initialized.
     error AlreadyInitialized();
 
-    /// Emitted when the contract already usin g the veFRAX balances.
+    /// Emitted when the contract is already using the veFRAX Aggregator balances.
     error AlreadyUsingVeFRAX();
 
     /// Emitted when the array lengths don't match.
     error ArrayLengthMismatch();
 
-    /// Emitted when the delegator is blacklisted by the delegatee.
-    error BlacklistedDelegator();
-
     /// Emitted when attempting to delegate to self.
     error CannotDelegateToSelf();
-
-    /// Emitted when the contract is operational and the action that requires it to be paused is attempted.
-    error ContractOperational();
-
-    /// Emitted when the contract is paused and the action that requires it to be operational is attempted.
-    error ContractPaused();
-
-    /// Emitted when attempting to reject delegatee that is not your own.
-    error DelegationMismatch();
-
-    /// Emitted when attempting to delegate with balance below the delegation threshold.
-    error InsufficientBalanceForDelegation();
 
     /// Emitted when the divisor for veFRAX is invalid.
     error InvalidVeFRAXDivisor();
@@ -60,12 +45,15 @@ interface IFloxCapacitorErrors {
     /// Emitted when the specified delegator is not blacklisted for the user.
     error NotBlacklistedDelegator();
 
-    /// Emitted when the owner tries to remove a Flox contributor that is not a Flox contributor.
+    /// Emitted when either 1) The sender is not a flox contributor or 2) the owner tries to remove a Flox contributor that is not an existing Flox contributor.
     error NotFloxContributor();
+
+    /// Emitted when the caller is not the owner or a Flox contributor.
+    error NotOwnerOrFloxContributor();
 
     /// Emitted when the contract is not using veFRAX balances.
     error NotUsingVeFRAX();
 
-    /// Emitted when the delegatee already has the maximum number of incoming delegations.
-    error TooManyIncomingDelegations();
+    /// Emitted when the address passed is the zero address.
+    error ZeroAddress();
 }

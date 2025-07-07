@@ -15,13 +15,13 @@ pragma solidity >=0.8.0;
 /**
  * @title IFraxStakerErrors
  * @author Frax Finance
- * @notice A collection of errors used by the FraxCAP system.
+ * @notice A collection of errors used by the FraxStaker system.
  */
 interface IFraxStakerErrors {
     /// Emitted when the staker is already blacklisted.
     error AlreadyBlacklistedStaker();
 
-    /// Emitted when attempting to telegate to someone when you already have an active delegation.
+    /// Emitted when attempting to delegate to someone when you already have an active delegation.
     error AlreadyDelegatedToAnotherDelegatee();
 
     /// Emitted when the owner tries to add a Frax contributor that is already a Frax contributor.
@@ -36,17 +36,14 @@ interface IFraxStakerErrors {
     /// Emitted when the contract is already initialized.
     error AlreadyInitialized();
 
-    /// Emitted when the address is already the slashing recipient.
+    /// Emitted when the supplied address is already the slashing recipient.
     error AlreadySlashingRecipient();
 
     /// Emitted when the staker is blacklisted.
     error BlacklistedStaker();
 
-    /// Emitted when attempting to delegete to self.
+    /// Emitted when attempting to delegate to self.
     error CannotDelegateToSelf();
-
-    /// Emitted when a user tries to transfer their stake.
-    error CannotTransferStake();
 
     /// Emitted when the contract is operational and the action that requires it to be paused is attempted.
     error ContractOperational();
@@ -60,7 +57,7 @@ interface IFraxStakerErrors {
     /// Emitted when attempting to create a stake with a zero amount.
     error InvalidStakeAmount();
 
-    /// Emitted when the staker tries to delegate their stake when they already have an active non-delegated stake.
+    /// Emitted when the staker tries to delegate their stake when they already have an active non-delegated stake to someone else.
     error NonDelegatedStakeAlreadyExists();
 
     /// Emitted when there is no proposed slashing recipient.
@@ -75,26 +72,25 @@ interface IFraxStakerErrors {
     /// Emitted when the staker is not frozen.
     error NotFrozenStaker();
 
+    /// Emitted when the caller is not the owner or a Frax contributor.
+    error NotOwnerOrFraxContributor();
+
     /// Emitted when attempting to update the slashing recipient before the update time delay has passed.
     error SlashingRecipientUpdateNotAvailableYet();
 
-    /// Emitted when attempting to add a delegatee that would overflow the maximum number of delegatees.
-    /// The maximum number of delegatees is 255. This is to prevent OOG reverts when iterating over the delegatees.
-    error TooManyDelegations();
+    /// Emitted when the sender is not a flox contributor.
+    error NotFloxContributor();
 
     /// Emitted when the FRAX transfer fails.
     error TransferFailed();
-
-    /// Emitted when revoking all delegations for a single staker fails.
-    error UnableToRevokeAllDelegations();
 
     /// Emitted when a user tries to deposit FRAX while they aleady have a stake with initiated withdrawal.
     /// They need to either cancel the withdrawal or wait for it to finish.
     error WithdrawalInitiated();
 
-    /// Emitted when a user tries to withdraw their stake but it is not available to bo withdrawn yet.
+    /// Emitted when a user tries to withdraw their stake but it is not available to be withdrawn yet.
     error WithdrawalNotAvailable();
 
-    /// Emitted when a user tries to withdraw their stake but it has not been initiated yet.
+    /// Emitted when a user tries to withdraw their stake but the withdrawal has not been initiated yet.
     error WithdrawalNotInitiated();
 }

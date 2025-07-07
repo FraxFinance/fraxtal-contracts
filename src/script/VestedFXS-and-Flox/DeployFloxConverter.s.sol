@@ -47,13 +47,13 @@ contract DeployFloxConverter is BaseScript {
         // Pass same arguments to implementation
         implementation.initialize({
             _owner: owner,
-            _floxCapacitor: floxCapacitor,
+            _floxCapacitor: payable(floxCapacitor),
             _fxtlPoints: fxtlPoints,
             _version: "FloxConverter_v1.0.0"
         });
 
         // Set the VeFXS interface to the proxy (note: not needed - for testing clarity)
-        floxConverter = FloxConverter(address(proxy));
+        floxConverter = FloxConverter(payable(address(proxy)));
     }
 
     function runTest(
